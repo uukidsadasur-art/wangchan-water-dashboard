@@ -79,81 +79,184 @@ function initDashboard() {
     setupEventListeners();
 }
 
-// ===== Data Source Configuration =====
-// ตั้งค่า APPS_SCRIPT_URL หลังจาก Deploy Google Apps Script แล้ว
-// เช่น: const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfy.../exec";
-// ถ้าว่างไว้ ระบบจะใช้ข้อมูลจาก data.js แทน (offline mode)
-const APPS_SCRIPT_URL = ""; // ← วาง URL ของ Apps Script ที่นี่
+// ===== Data Source: Google Sheets (Direct CSV) =====
+const SHEET_ID   = "1TrzIgdqfWHTJpQWGnRiuujLyr_yNYxQA9oBriqOyM_k";
+const SHEET_NAME = "Raw data";
+const SHEET_CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(SHEET_NAME)}`;
 
-// Load data: ลองดึงจาก Apps Script ก่อน ถ้าไม่ได้ค่อย fallback ไป data.js
-async function fetchData() {
-    // --- แสดงสถานะกำลังโหลด ---
-    if (tableBody) {
-        tableBody.innerHTML = `<tr><td colspan="13" class="loading-text"><i class="fa-solid fa-spinner fa-spin"></i> กำลังโหลดข้อมูล...</td></tr>`;
-    }
+// Column indices (0-based) ตรงกับ Raw data sheet
+const CI = {
+    DATE:           0,   // A
+    ALUM_QTY:       1,   // B
+    ALUM_COST:      2,   // C
+    CL_QTY:         3,   // D
+    CL_COST:        4,   // E
+    CITRIC_QTY:     5,   // F
+    CITRIC_COST:    6,   // G
+    HCL_QTY:        7,   // H
+    HCL_COST:       8,   // I
+    NAOH_QTY:       9,   // J
+    NAOH_COST:      10,  // K
+    CHEM_COST_M3:   12,  // M
+    ELEC_COST_M3:   14,  // O
+    TOTAL_COST_M3:  15,  // P
+    WATER_QTY:      16,  // Q
+    YIELD:          20,  // U
+    ELEC1:          40,  // AO
+    ELEC2:          42,  // AQ
+};
 
-    // 1) ถ้ากำหนด APPS_SCRIPT_URL ไว้ → ดึง Live data จาก Google Sheet
-    if (APPS_SCRIPT_URL && APPS_SCRIPT_URL.trim() !== "") {
-        try {
-            const response = await fetch(APPS_SCRIPT_URL);
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
-            const liveData = await response.json();
-            if (!Array.isArray(liveData) || liveData.length === 0) throw new Error("ข้อมูลว่างเปล่า");
-
-            allRecords = liveData;
-            allRecords.sort((a, b) => new Date(a.date) - new Date(b.date));
-            console.log(`✅ Live data loaded: ${allRecords.length} records from Google Sheet`);
-            showDataSourceBadge('live');
-            filterAndProcessData();
-            return;
-        } catch (err) {
-            console.warn("⚠️ Apps Script fetch failed, falling back to data.js:", err.message);
+// Simple CSV row parser (handles quoted fields)
+function parseCSVRow(row) {
+    const result = [];
+    let cur = '';
+    let inQuotes = false;
+    for (let i = 0; i < row.length; i++) {
+        const ch = row[i];
+        if (ch === '"') {
+            inQuotes = !inQuotes;
+        } else if (ch === ',' && !inQuotes) {
+            result.push(cur.trim());
+            cur = '';
+        } else {
+            cur += ch;
         }
     }
+    result.push(cur.trim());
+    return result;
+}
 
-    // 2) Fallback → ใช้ข้อมูลจาก data.js (embedded static)
+function parseNum(val) {
+    if (val === null || val === undefined || val === '') return 0;
+    const clean = String(val).replace(/,/g, '').replace(/%/g, '').trim();
+    if (clean === '-' || clean === '') return 0;
+    const n = parseFloat(clean);
+    return isNaN(n) ? 0 : n;
+}
+
+function parseYield(val) {
+    if (val === null || val === undefined || val === '') return null;
+    const clean = String(val).replace(/,/g, '').replace(/%/g, '').trim();
+    if (clean === '-' || clean === '' || clean === '0') return null;
+    const n = parseFloat(clean);
+    return isNaN(n) || n === 0 ? null : n;
+}
+
+function parseDate(val) {
+    if (!val) return null;
+    // M/D/YYYY
+    const parts = val.split('/');
+    if (parts.length === 3) {
+        const m = String(parseInt(parts[0])).padStart(2, '0');
+        const d = String(parseInt(parts[1])).padStart(2, '0');
+        const y = parts[2].length === 2 ? '20' + parts[2] : parts[2];
+        return `${y}-${m}-${d}`;
+    }
+    // Already YYYY-MM-DD
+    if (/^\d{4}-\d{2}-\d{2}$/.test(val)) return val;
+    return null;
+}
+
+function csvToRecords(csvText) {
+    const lines = csvText.split('\n').filter(l => l.trim() !== '');
+    const records = [];
+    for (let i = 0; i < lines.length; i++) {
+        const cols = parseCSVRow(lines[i]);
+        const rawDate = cols[CI.DATE];
+        if (!rawDate || !/\d/.test(rawDate)) continue; // skip header/empty
+        const dateStr = parseDate(rawDate);
+        if (!dateStr) continue;
+
+        records.push({
+            date:           dateStr,
+            water_qty:      parseNum(cols[CI.WATER_QTY]),
+            system_yield:   parseYield(cols[CI.YIELD]),
+            alum_qty:       parseNum(cols[CI.ALUM_QTY]),
+            alum_cost:      parseNum(cols[CI.ALUM_COST]),
+            chlorine_qty:   parseNum(cols[CI.CL_QTY]),
+            chlorine_cost:  parseNum(cols[CI.CL_COST]),
+            citric_qty:     parseNum(cols[CI.CITRIC_QTY]),
+            citric_cost:    parseNum(cols[CI.CITRIC_COST]),
+            hcl_qty:        parseNum(cols[CI.HCL_QTY]),
+            hcl_cost:       parseNum(cols[CI.HCL_COST]),
+            naoh_qty:       parseNum(cols[CI.NAOH_QTY]),
+            naoh_cost:      parseNum(cols[CI.NAOH_COST]),
+            chem_cost_m3:   parseNum(cols[CI.CHEM_COST_M3]),
+            elec_qty:       parseNum(cols[CI.ELEC1]) + parseNum(cols[CI.ELEC2]),
+            elec_cost_m3:   parseNum(cols[CI.ELEC_COST_M3]),
+            total_cost_m3:  parseNum(cols[CI.TOTAL_COST_M3]),
+        });
+    }
+    return records;
+}
+
+// Main data loader: Live Google Sheet → fallback data.js
+async function fetchData() {
+    if (tableBody) {
+        tableBody.innerHTML = `<tr><td colspan="13" class="loading-text"><i class="fa-solid fa-spinner fa-spin"></i> กำลังดึงข้อมูลจาก Google Sheet...</td></tr>`;
+    }
+
+    // 1) ลองดึง Live CSV จาก Google Sheets
+    try {
+        const res = await fetch(SHEET_CSV_URL);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const csvText = await res.text();
+        const records = csvToRecords(csvText);
+        if (records.length === 0) throw new Error('ไม่พบแถวข้อมูลใน Sheet');
+
+        allRecords = records;
+        allRecords.sort((a, b) => new Date(a.date) - new Date(b.date));
+        console.log(`✅ Live: โหลดข้อมูล ${allRecords.length} แถวจาก Google Sheet`);
+        showDataSourceBadge('live');
+        filterAndProcessData();
+        return;
+    } catch (err) {
+        console.warn('⚠️ Google Sheet fetch ล้มเหลว (Sheet อาจไม่เป็น Public):', err.message);
+    }
+
+    // 2) Fallback → ใช้ data.js (ข้อมูล offline)
     try {
         if (typeof allRecordsData === 'undefined' || !Array.isArray(allRecordsData)) {
-            throw new Error('ไม่พบข้อมูล — ตรวจสอบว่าโหลดไฟล์ data.js แล้ว');
+            throw new Error('ไม่พบข้อมูล — กรุณาตั้งค่า Sheet ให้เป็น Public หรือตรวจสอบ data.js');
         }
         allRecords = [...allRecordsData];
         allRecords.sort((a, b) => new Date(a.date) - new Date(b.date));
-        console.log(`📦 Static data loaded: ${allRecords.length} records from data.js`);
+        console.log(`📦 Offline: โหลดข้อมูล ${allRecords.length} แถวจาก data.js`);
         showDataSourceBadge('static');
         filterAndProcessData();
     } catch (error) {
-        console.error('Error loading data:', error);
+        console.error('Error:', error);
         if (tableBody) {
-            tableBody.innerHTML = `<tr><td colspan="13" class="loading-text" style="color: var(--color-kpi-fail);"><i class="fa-solid fa-triangle-exclamation"></i> เกิดข้อผิดพลาดในการโหลดข้อมูล: ${error.message}</td></tr>`;
+            tableBody.innerHTML = `<tr><td colspan="13" class="loading-text" style="color:var(--color-kpi-fail);">
+                <i class="fa-solid fa-triangle-exclamation"></i> โหลดข้อมูลไม่ได้: ${error.message}<br>
+                <small>กรุณาตั้งค่า Google Sheet ให้เป็น "Anyone with link can view"</small>
+            </td></tr>`;
         }
     }
 }
 
-// แสดง badge บอกแหล่งข้อมูล
+// Badge บอกแหล่งข้อมูล (มุมขวาล่าง)
 function showDataSourceBadge(mode) {
-    const existingBadge = document.getElementById('data-source-badge');
-    if (existingBadge) existingBadge.remove();
-
+    const existing = document.getElementById('data-source-badge');
+    if (existing) existing.remove();
     const badge = document.createElement('div');
     badge.id = 'data-source-badge';
     if (mode === 'live') {
-        badge.innerHTML = `<i class="fa-solid fa-circle" style="color:#00e676;font-size:8px;"></i> Live — Google Sheet`;
+        badge.innerHTML = `<i class="fa-solid fa-circle" style="color:#00e676;font-size:8px;animation:pulse 2s infinite;"></i>&nbsp; Live — Google Sheet`;
         badge.title = 'ข้อมูล Real-time จาก Google Sheets';
     } else {
-        badge.innerHTML = `<i class="fa-solid fa-circle" style="color:#ffcc00;font-size:8px;"></i> Offline — data.js`;
-        badge.title = 'ข้อมูล Offline (ไม่ได้ตั้งค่า Apps Script URL)';
+        badge.innerHTML = `<i class="fa-solid fa-circle" style="color:#ffcc00;font-size:8px;"></i>&nbsp; Offline — data.js (Sheet ยังไม่ Public)`;
+        badge.title = 'ใช้ข้อมูล Offline เพราะดึง Google Sheet ไม่ได้';
     }
-    badge.style.cssText = `
-        position: fixed; bottom: 16px; right: 16px; z-index: 9999;
-        background: rgba(10,13,20,0.85); backdrop-filter: blur(8px);
-        border: 1px solid rgba(255,255,255,0.1); border-radius: 20px;
-        padding: 6px 14px; font-size: 12px; color: var(--text-secondary);
-        display: flex; align-items: center; gap: 6px;
-        font-family: 'Outfit', sans-serif; font-weight: 500;
-    `;
+    badge.style.cssText = `position:fixed;bottom:16px;right:16px;z-index:9999;
+        background:rgba(10,13,20,0.88);backdrop-filter:blur(10px);
+        border:1px solid rgba(255,255,255,0.1);border-radius:20px;
+        padding:7px 16px;font-size:12px;color:var(--text-secondary);
+        display:flex;align-items:center;gap:6px;
+        font-family:'Outfit',sans-serif;font-weight:500;
+        box-shadow:0 4px 16px rgba(0,0,0,0.4);`;
     document.body.appendChild(badge);
 }
-
 
 // Event Listeners Setup
 function setupEventListeners() {
