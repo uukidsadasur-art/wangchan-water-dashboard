@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบผลิตน้ำประปา โครงการวังจันทร์วัลเลย์</title>
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Embedded data (avoids CORS issues with local file:// protocol) -->
+    <script src="data.js"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar / Navigation Header -->
+        <header class="app-header">
+            <div class="logo-area">
+                <div class="logo-icon">
+                    <i class="fa-solid fa-droplet"></i>
+                </div>
+                <div class="logo-text">
+                    <h1>ระบบผลิตน้ำประปา</h1>
+                    <span class="sub-text">โครงการวังจันทร์วัลเลย์ (Wangchan Valley)</span>
+                </div>
+            </div>
+            
+            <div class="controls-area">
+                <!-- Month Filter -->
+                <div class="control-group">
+                    <label for="month-select"><i class="fa-regular fa-calendar-days"></i> เลือกเดือน:</label>
+                    <select id="month-select">
+                        <option value="all">แสดงทั้งปี 2569</option>
+                        <option value="01" selected>มกราคม 2569</option>
+                        <option value="02">กุมภาพันธ์ 2569</option>
+                        <option value="03">มีนาคม 2569</option>
+                        <option value="04">เมษายน 2569</option>
+                        <option value="05">พฤษภาคม 2569</option>
+                        <option value="06">มิถุนายน 2569</option>
+                        <option value="07">กรกฎาคม 2569</option>
+                        <option value="08">สิงหาคม 2569</option>
+                        <option value="09">กันยายน 2569</option>
+                        <option value="10">ตุลาคม 2569</option>
+                        <option value="11">พฤศจิกายน 2569</option>
+                        <option value="12">ธันวาคม 2569</option>
+                    </select>
+                </div>
+
+                <!-- Interval View Selector -->
+                <div class="control-group">
+                    <label><i class="fa-solid fa-chart-line"></i> รูปแบบข้อมูล:</label>
+                    <div class="segmented-control" id="view-mode">
+                        <button class="segment-btn active" data-mode="daily">รายวัน</button>
+                        <button class="segment-btn" data-mode="weekly">รายสัปดาห์</button>
+                        <button class="segment-btn" data-mode="monthly">รายเดือน</button>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- KPI Dashboard Cards Grid -->
+        <section class="kpi-grid">
+            <!-- 1. Water Qty KPI Card -->
+            <div class="kpi-card" id="kpi-water">
+                <div class="card-icon water-theme">
+                    <i class="fa-solid fa-faucet-drip"></i>
+                </div>
+                <div class="card-info">
+                    <h3>ปริมาณน้ำจ่าย</h3>
+                    <div class="primary-value"><span id="water-daily">-</span> <span class="unit">ลบ.ม.</span></div>
+                    <div class="metric-breakdown">
+                        <div class="sub-metric">
+                            <span class="label">สะสมเดือนนี้</span>
+                            <span class="val" id="water-month-acc">-</span>
+                        </div>
+                        <div class="sub-metric">
+                            <span class="label">เฉลี่ยรายเดือน</span>
+                            <span class="val" id="water-month-avg">-</span>
+                        </div>
+                        <div class="sub-metric">
+                            <span class="label">สะสมรายปี</span>
+                            <span class="val" id="water-year-acc">-</span>
+                        </div>
+                        <div class="sub-metric">
+                            <span class="label">เฉลี่ยรายปี</span>
+                            <span class="val" id="water-year-avg">-</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2. System Yield KPI Card -->
+            <div class="kpi-card" id="kpi-yield">
+                <div class="card-icon yield-theme">
+                    <i class="fa-solid fa-percent"></i>
+                </div>
+                <div class="card-info">
+                    <h3>System Yield</h3>
+                    <div class="primary-value"><span id="yield-daily">-</span> <span class="unit">%</span></div>
+                    <div class="kpi-target-tag">เป้าหมายตามสัญญา &ge; 97%</div>
+                    <div class="metric-breakdown">
+                        <div class="sub-metric">
+                            <span class="label">เฉลี่ยรายเดือน</span>
+                            <span class="val" id="yield-month-avg">-</span>
+                        </div>
+                        <div class="sub-metric">
+                            <span class="label">เฉลี่ยรายปี</span>
+                            <span class="val" id="yield-year-avg">-</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3. Chemical Cost per m3 KPI Card -->
+            <div class="kpi-card" id="kpi-chem-cost">
+                <div class="card-icon chem-theme">
+                    <i class="fa-solid fa-flask"></i>
+                </div>
+                <div class="card-info">
+                    <h3>ต้นทุนสารเคมี</h3>
+                    <div class="primary-value"><span id="chem-cost-daily">-</span> <span class="unit">บาท/ลบ.ม.</span></div>
+                    <div class="kpi-target-tag" id="kpi-tag-chem">KPI &le; 1.12 บาท/ลบ.ม.</div>
+                    <div class="metric-breakdown">
+                        <div class="sub-metric">
+                            <span class="label">เฉลี่ยรายเดือน</span>
+                            <span class="val" id="chem-cost-month-avg">-</span>
+                        </div>
+                        <div class="sub-metric">
+                            <span class="label">เฉลี่ยรายปี</span>
+                            <span class="val" id="chem-cost-year-avg">-</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 4. Electricity Cost per m3 KPI Card -->
+            <div class="kpi-card" id="kpi-elec-cost">
+                <div class="card-icon power-theme">
+                    <i class="fa-solid fa-bolt"></i>
+                </div>
+                <div class="card-info">
+                    <h3>ต้นทุนไฟฟ้า</h3>
+                    <div class="primary-value"><span id="elec-cost-daily">-</span> <span class="unit">บาท/ลบ.ม.</span></div>
+                    <div class="kpi-target-tag" id="kpi-tag-elec">KPI &le; 1.42 บาท/ลบ.ม.</div>
+                    <div class="metric-breakdown">
+                        <div class="sub-metric">
+                            <span class="label">เฉลี่ยรายเดือน</span>
+                            <span class="val" id="elec-cost-month-avg">-</span>
+                        </div>
+                        <div class="sub-metric">
+                            <span class="label">เฉลี่ยรายปี</span>
+                            <span class="val" id="elec-cost-year-avg">-</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 5. Total Cost per m3 KPI Card -->
+            <div class="kpi-card" id="kpi-total-cost">
+                <div class="card-icon total-theme">
+                    <i class="fa-solid fa-coins"></i>
+                </div>
+                <div class="card-info">
+                    <h3>ต้นทุนรวม (เคมี + ไฟฟ้า)</h3>
+                    <div class="primary-value"><span id="total-cost-daily">-</span> <span class="unit">บาท/ลบ.ม.</span></div>
+                    <div class="kpi-target-tag" id="kpi-tag-total">KPI &le; 2.54 บาท/ลบ.ม.</div>
+                    <div class="metric-breakdown">
+                        <div class="sub-metric">
+                            <span class="label">เฉลี่ยรายเดือน</span>
+                            <span class="val" id="total-cost-month-avg">-</span>
+                        </div>
+                        <div class="sub-metric">
+                            <span class="label">เฉลี่ยรายปี</span>
+                            <span class="val" id="total-cost-year-avg">-</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Main Visual Charts Layout -->
+        <main class="dashboard-main-grid">
+            <!-- Main Yield & Production Trend -->
+            <div class="chart-container-large card-panel">
+                <div class="panel-header">
+                    <h2><i class="fa-solid fa-chart-area"></i> แนวโน้มปริมาณน้ำจ่าย และ System Yield</h2>
+                    <span class="panel-desc">แสดงการเปลี่ยนแปลงปริมาณน้ำประปาจ่ายคู่กับประสิทธิภาพการผลิต</span>
+                </div>
+                <div class="chart-wrapper">
+                    <canvas id="yieldProductionChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Costs Trend vs KPI Limits -->
+            <div class="chart-container-medium card-panel">
+                <div class="panel-header">
+                    <h2><i class="fa-solid fa-chart-column"></i> สรุปต้นทุนน้ำประปาเทียบกับค่า KPI</h2>
+                    <span class="panel-desc">ต้นทุนสารเคมี, ต้นทุนไฟฟ้า, และต้นทุนรวมเทียบกับเส้นควบคุมเกณฑ์สัญญา</span>
+                </div>
+                <div class="chart-wrapper">
+                    <canvas id="costsKpiChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Chemical Usages & Costs tab container -->
+            <div class="card-panel chem-panel-section">
+                <div class="panel-header flex-header">
+                    <div>
+                        <h2><i class="fa-solid fa-vials"></i> ปริมาณและต้นทุนค่าสารเคมี</h2>
+                        <span class="panel-desc">สถิติปริมาณการใช้งาน (kg) และต้นทุนรวม (บาท) ของสารเคมีทั้ง 5 ชนิด</span>
+                    </div>
+                    <!-- Chemical Tab Selector -->
+                    <div class="tab-list" id="chem-tabs">
+                        <button class="tab-btn active" data-chem="alum">Alum</button>
+                        <button class="tab-btn" data-chem="chlorine">Chlorine</button>
+                        <button class="tab-btn" data-chem="citric">Citric Acid</button>
+                        <button class="tab-btn" data-chem="hcl">HCl</button>
+                        <button class="tab-btn" data-chem="naoh">NaOH</button>
+                    </div>
+                </div>
+
+                <div class="chem-data-details">
+                    <!-- Quick Stats Inside tab -->
+                    <div class="chem-stats-grid">
+                        <div class="mini-stat-card">
+                            <span class="label">ปริมาณใช้งานวันนี้</span>
+                            <div class="val"><span id="tab-chem-qty-daily">-</span> <span class="unit">kg</span></div>
+                        </div>
+                        <div class="mini-stat-card">
+                            <span class="label">สะสมเดือนนี้</span>
+                            <div class="val"><span id="tab-chem-qty-month-acc">-</span> <span class="unit">kg</span></div>
+                        </div>
+                        <div class="mini-stat-card">
+                            <span class="label">ต้นทุนสารวันนี้</span>
+                            <div class="val"><span id="tab-chem-cost-daily">-</span> <span class="unit">บาท</span></div>
+                        </div>
+                        <div class="mini-stat-card">
+                            <span class="label">ต้นทุนสะสมเดือนนี้</span>
+                            <div class="val"><span id="tab-chem-cost-month-acc">-</span> <span class="unit">บาท</span></div>
+                        </div>
+                    </div>
+                    <!-- Tab Chart -->
+                    <div class="tab-chart-wrapper">
+                        <canvas id="chemDetailChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Electricity Usage Section -->
+            <div class="card-panel elec-panel-section">
+                <div class="panel-header">
+                    <h2><i class="fa-solid fa-plug-circle-bolt"></i> ปริมาณการใช้ไฟฟ้าของระบบ</h2>
+                    <span class="panel-desc">ปริมาณการใช้ไฟฟ้าสะสม (kW) ของตู้ PM1 และ PM2 รวมกัน</span>
+                </div>
+                <div class="elec-data-details">
+                    <div class="elec-stats-grid">
+                        <div class="mini-stat-card power-theme">
+                            <span class="label">การใช้ไฟฟ้ารายวัน</span>
+                            <div class="val"><span id="elec-usage-daily">-</span> <span class="unit">kW</span></div>
+                        </div>
+                        <div class="mini-stat-card power-theme">
+                            <span class="label">การใช้ไฟฟ้าสะสมเดือนนี้</span>
+                            <div class="val"><span id="elec-usage-month-acc">-</span> <span class="unit">kW</span></div>
+                        </div>
+                    </div>
+                    <div class="tab-chart-wrapper">
+                        <canvas id="electricityChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Detailed Month Logs Table (Requirements 9) -->
+        <section class="card-panel logs-panel-section">
+            <div class="panel-header flex-header">
+                <div>
+                    <h2><i class="fa-solid fa-table-list"></i> ตารางบันทึกข้อมูลรายวัน</h2>
+                    <span class="panel-desc" id="table-title">ตารางข้อมูลเฉพาะเดือนมกราคม 2569</span>
+                </div>
+                <div class="table-actions">
+                    <button class="btn btn-outline" id="btn-export-csv"><i class="fa-solid fa-file-csv"></i> ส่งออกข้อมูล (CSV)</button>
+                </div>
+            </div>
+            
+            <div class="table-container">
+                <table class="data-table" id="daily-data-table">
+                    <thead>
+                        <tr>
+                            <th rowspan="2">วันที่</th>
+                            <th rowspan="2">ปริมาณน้ำจ่าย<br>(ลบ.ม.)</th>
+                            <th rowspan="2">System Yield<br>(%)</th>
+                            <th colspan="2">การใช้ไฟฟ้า</th>
+                            <th colspan="3">ต้นทุนเฉลี่ย (บาท/ลบ.ม.)</th>
+                            <th colspan="5">ปริมาณการใช้สารเคมี (kg)</th>
+                        </tr>
+                        <tr>
+                            <th>ไฟฟ้า (kW)</th>
+                            <th>ค่าไฟ (บาท)</th>
+                            <th>สารเคมี</th>
+                            <th>ไฟฟ้า</th>
+                            <th>รวม</th>
+                            <th>Alum</th>
+                            <th>Chlorine</th>
+                            <th>Citric</th>
+                            <th>HCl</th>
+                            <th>NaOH</th>
+                        </tr>
+                    </thead>
+                    <tbody id="table-body">
+                        <!-- Filled in dynamically by JS -->
+                        <tr>
+                            <td colspan="13" class="loading-text">กำลังโหลดข้อมูล...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer class="app-footer">
+            <p>&copy; 2026 ระบบการจัดการน้ำประปา โครงการวังจันทร์วัลเลย์ | ข้อมูลอ้างอิงจากแผนปฏิบัติการระบบน้ำ</p>
+        </footer>
+    </div>
+
+    <!-- Password Protection Overlay -->
+    <div id="password-overlay" class="password-overlay">
+        <div class="password-box">
+            <div class="lock-icon"><i class="fa-solid fa-lock"></i></div>
+            <h2>ระบบผลิตน้ำประปาโครงการวังจันทร์วัลเลย์</h2>
+            <p>กรุณากรอกรหัสผ่านเพื่อเข้าใช้งานแดชบอร์ด</p>
+            <form id="password-form">
+                <input type="password" id="password-input" placeholder="รหัสผ่าน" required autocomplete="current-password">
+                <button type="submit">เข้าสู่ระบบ</button>
+            </form>
+            <div id="password-error" class="error-msg" style="display: none;"><i class="fa-solid fa-triangle-exclamation"></i> รหัสผ่านไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง</div>
+        </div>
+    </div>
+
+    <!-- Application Script -->
+    <script src="app.js"></script>
+</body>
+</html>
