@@ -103,7 +103,7 @@ function fetchData() {
 
 // Event Listeners Setup
 function setupEventListeners() {
-    // Month change
+    // Month change — reset day selection and rebuild day picker
     monthSelect.addEventListener('change', () => {
         filterAndProcessData();
     });
@@ -133,6 +133,17 @@ function setupEventListeners() {
 
     // Export CSV Button
     btnExportCsv.addEventListener('click', exportCSV);
+
+    // Day Clear Button
+    document.getElementById('day-clear-btn').addEventListener('click', () => {
+        // Reset to latest day in filtered records
+        if (filteredRecords.length > 0) {
+            activeDayRecord = filteredRecords[filteredRecords.length - 1];
+        }
+        renderDayPicker();
+        updateKpiCards();
+        highlightTableRow();
+    });
 }
 
 // Core Data Filter and Aggregator
@@ -163,12 +174,134 @@ function filterAndProcessData() {
         activeDayRecord = null;
     }
 
-    // 2. Update KPI Cards & Render Daily Table
+    // 2. Render Day Picker
+    renderDayPicker();
+
+    // 3. Update KPI Cards & Render Daily Table
     updateKpiCards();
     renderDailyTable();
 
-    // 3. Render and Update Charts based on viewMode
+    // 4. Render and Update Charts based on viewMode
     updateCharts(viewMode);
+}
+
+// ===== Day Picker =====
+const monthNamesAll = [
+    'มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน',
+    'กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'
+];
+
+function renderDayPicker() {
+    const dayGrid = document.getElementById('day-grid');
+    const dayPickerLabel = document.getElementById('day-picker-label');
+    const clearBtn = document.getElementById('day-clear-btn');
+
+    if (!filteredRecords || filteredRecords.length === 0) {
+        dayGrid.innerHTML = '<span style="color:var(--text-muted);font-size:13px;">ไม่มีข้อมูลในเดือนนี้</span>';
+        clearBtn.style.display = 'none';
+        return;
+    }
+
+    // Build a map: day -> record
+    const dayMap = {};
+    filteredRecords.forEach(r => {
+        const day = parseInt(r.date.split('-')[2]);
+        dayMap[day] = r;
+    });
+
+    // Get the month/year of filtered records
+    const firstDate = filteredRecords[0].date.split('-');
+    const monthIdx = parseInt(firstDate[1]) - 1;
+    const year = parseInt(firstDate[0]);
+    const daysInMonth = new Date(year, monthIdx + 1, 0).getDate();
+
+    // Update label
+    const selectedMonth = monthSelect.value;
+    if (selectedMonth === 'all') {
+        dayPickerLabel.innerHTML = '<i class="fa-regular fa-calendar-check"></i> เลือกวันที่ต้องการดูข้อมูล (แสดงทั้งปี — กรุณาเลือกเดือนก่อน):';
+    } else {
+        dayPickerLabel.innerHTML = `<i class="fa-regular fa-calendar-check"></i> เลือกวันที่ต้องการดูข้อมูล — <strong style="color:var(--color-water)">${monthNamesAll[monthIdx]} ${year + 543}</strong>:`;
+    }
+
+    // Show/hide clear button
+    const isLatestDay = activeDayRecord && activeDayRecord.date === filteredRecords[filteredRecords.length - 1].date;
+    clearBtn.style.display = !isLatestDay ? 'flex' : 'none';
+
+    // If 'all' selected — show a simple message instead of 365 buttons
+    if (selectedMonth === 'all') {
+        dayGrid.innerHTML = `<span style="color:var(--text-muted);font-size:13px;"><i class="fa-solid fa-info-circle"></i> กรุณาเลือกเดือนในตัวกรองด้านบนก่อน เพื่อแสดงปุ่มเลือกวัน</span>`;
+        return;
+    }
+
+    // Build day buttons 1..daysInMonth
+    let html = '';
+    for (let d = 1; d <= daysInMonth; d++) {
+        const rec = dayMap[d];
+        const isActive = activeDayRecord && parseInt(activeDayRecord.date.split('-')[2]) === d;
+        const dateStr = `${year}-${String(monthIdx + 1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+
+        let btnClass = 'day-btn';
+        let titleAttr = `วันที่ ${d} — ไม่มีข้อมูล`;
+
+        if (rec) {
+            btnClass += ' has-data';
+            const yieldVal = rec.system_yield;
+            if (yieldVal === null || yieldVal === 0) {
+                btnClass += ' yield-na';
+                titleAttr = `${d}/${monthIdx+1}/${year+543} | ปริมาณน้ำ: ${formatNum(rec.water_qty)} ลบ.ม. | Yield: N/A`;
+            } else if (yieldVal >= CONTRACT_YIELD) {
+                btnClass += ' yield-pass';
+                titleAttr = `${d}/${monthIdx+1}/${year+543} | ปริมาณน้ำ: ${formatNum(rec.water_qty)} ลบ.ม. | Yield: ${formatNum(yieldVal,2)}% ✓`;
+            } else {
+                btnClass += ' yield-fail';
+                titleAttr = `${d}/${monthIdx+1}/${year+543} | ปริมาณน้ำ: ${formatNum(rec.water_qty)} ลบ.ม. | Yield: ${formatNum(yieldVal,2)}% ✗`;
+            }
+        } else {
+            btnClass += ' no-data';
+        }
+
+        if (isActive) btnClass += ' active';
+
+        html += `<button class="${btnClass}" data-date="${dateStr}" title="${titleAttr}">${d}</button>`;
+    }
+
+    dayGrid.innerHTML = html;
+
+    // Add click listeners
+    dayGrid.querySelectorAll('.day-btn:not(.no-data)').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const date = btn.dataset.date;
+            const rec = allRecords.find(r => r.date === date);
+            if (!rec) return;
+
+            activeDayRecord = rec;
+
+            // Update active class
+            dayGrid.querySelectorAll('.day-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+
+            // Show/hide clear button
+            const isLastDay = activeDayRecord.date === filteredRecords[filteredRecords.length - 1].date;
+            document.getElementById('day-clear-btn').style.display = !isLastDay ? 'flex' : 'none';
+
+            // Update KPIs and highlight table row
+            updateKpiCards();
+            highlightTableRow();
+        });
+    });
+}
+
+// Highlight the active row in the daily table
+function highlightTableRow() {
+    if (!activeDayRecord) return;
+    const rows = tableBody.querySelectorAll('tr');
+    rows.forEach(row => {
+        row.classList.remove('highlight-row');
+        if (row.dataset.date === activeDayRecord.date) {
+            row.classList.add('highlight-row');
+            row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+    });
 }
 
 // Calculate and Update KPI Card Metrics
