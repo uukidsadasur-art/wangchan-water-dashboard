@@ -79,19 +79,47 @@ function initDashboard() {
     setupEventListeners();
 }
 
-// Load data from embedded data.js variable (no CORS issues with file:// protocol)
-function fetchData() {
+// ===== Data Source Configuration =====
+// ตั้งค่า APPS_SCRIPT_URL หลังจาก Deploy Google Apps Script แล้ว
+// เช่น: const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfy.../exec";
+// ถ้าว่างไว้ ระบบจะใช้ข้อมูลจาก data.js แทน (offline mode)
+const APPS_SCRIPT_URL = ""; // ← วาง URL ของ Apps Script ที่นี่
+
+// Load data: ลองดึงจาก Apps Script ก่อน ถ้าไม่ได้ค่อย fallback ไป data.js
+async function fetchData() {
+    // --- แสดงสถานะกำลังโหลด ---
+    if (tableBody) {
+        tableBody.innerHTML = `<tr><td colspan="13" class="loading-text"><i class="fa-solid fa-spinner fa-spin"></i> กำลังโหลดข้อมูล...</td></tr>`;
+    }
+
+    // 1) ถ้ากำหนด APPS_SCRIPT_URL ไว้ → ดึง Live data จาก Google Sheet
+    if (APPS_SCRIPT_URL && APPS_SCRIPT_URL.trim() !== "") {
+        try {
+            const response = await fetch(APPS_SCRIPT_URL);
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const liveData = await response.json();
+            if (!Array.isArray(liveData) || liveData.length === 0) throw new Error("ข้อมูลว่างเปล่า");
+
+            allRecords = liveData;
+            allRecords.sort((a, b) => new Date(a.date) - new Date(b.date));
+            console.log(`✅ Live data loaded: ${allRecords.length} records from Google Sheet`);
+            showDataSourceBadge('live');
+            filterAndProcessData();
+            return;
+        } catch (err) {
+            console.warn("⚠️ Apps Script fetch failed, falling back to data.js:", err.message);
+        }
+    }
+
+    // 2) Fallback → ใช้ข้อมูลจาก data.js (embedded static)
     try {
         if (typeof allRecordsData === 'undefined' || !Array.isArray(allRecordsData)) {
-            throw new Error('ไม่พบข้อมูล allRecordsData — ตรวจสอบว่าโหลดไฟล์ data.js แล้ว');
+            throw new Error('ไม่พบข้อมูล — ตรวจสอบว่าโหลดไฟล์ data.js แล้ว');
         }
-
         allRecords = [...allRecordsData];
-        
-        // Sort records by date to ensure correct timeline
         allRecords.sort((a, b) => new Date(a.date) - new Date(b.date));
-        
-        // Process data
+        console.log(`📦 Static data loaded: ${allRecords.length} records from data.js`);
+        showDataSourceBadge('static');
         filterAndProcessData();
     } catch (error) {
         console.error('Error loading data:', error);
@@ -100,6 +128,32 @@ function fetchData() {
         }
     }
 }
+
+// แสดง badge บอกแหล่งข้อมูล
+function showDataSourceBadge(mode) {
+    const existingBadge = document.getElementById('data-source-badge');
+    if (existingBadge) existingBadge.remove();
+
+    const badge = document.createElement('div');
+    badge.id = 'data-source-badge';
+    if (mode === 'live') {
+        badge.innerHTML = `<i class="fa-solid fa-circle" style="color:#00e676;font-size:8px;"></i> Live — Google Sheet`;
+        badge.title = 'ข้อมูล Real-time จาก Google Sheets';
+    } else {
+        badge.innerHTML = `<i class="fa-solid fa-circle" style="color:#ffcc00;font-size:8px;"></i> Offline — data.js`;
+        badge.title = 'ข้อมูล Offline (ไม่ได้ตั้งค่า Apps Script URL)';
+    }
+    badge.style.cssText = `
+        position: fixed; bottom: 16px; right: 16px; z-index: 9999;
+        background: rgba(10,13,20,0.85); backdrop-filter: blur(8px);
+        border: 1px solid rgba(255,255,255,0.1); border-radius: 20px;
+        padding: 6px 14px; font-size: 12px; color: var(--text-secondary);
+        display: flex; align-items: center; gap: 6px;
+        font-family: 'Outfit', sans-serif; font-weight: 500;
+    `;
+    document.body.appendChild(badge);
+}
+
 
 // Event Listeners Setup
 function setupEventListeners() {
