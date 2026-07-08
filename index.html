@@ -63,6 +63,19 @@
             </div>
         </header>
 
+        <!-- Day Picker Strip -->
+        <section class="day-picker-section" id="day-picker-section">
+            <div class="day-picker-header">
+                <span id="day-picker-label"><i class="fa-regular fa-calendar-check"></i> เลือกวันที่ต้องการดูข้อมูล:</span>
+                <button class="day-clear-btn" id="day-clear-btn" style="display:none;">
+                    <i class="fa-solid fa-rotate-left"></i> ล้างการเลือก (แสดงวันล่าสุด)
+                </button>
+            </div>
+            <div class="day-grid" id="day-grid">
+                <!-- Day buttons rendered dynamically by app.js -->
+            </div>
+        </section>
+
         <!-- KPI Dashboard Cards Grid -->
         <section class="kpi-grid">
             <!-- 1. Water Qty KPI Card -->
