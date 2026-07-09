@@ -293,13 +293,39 @@ function setupEventListeners() {
 
     // Day Clear Button
     document.getElementById('day-clear-btn').addEventListener('click', () => {
-        // Reset to latest day in filtered records
         if (filteredRecords.length > 0) {
             activeDayRecord = filteredRecords[filteredRecords.length - 1];
         }
         renderDayPicker();
         updateKpiCards();
         highlightTableRow();
+    });
+
+    // Day Picker Dropdown — toggle open/close
+    const trigger = document.getElementById('day-picker-trigger');
+    const dropdown = document.getElementById('day-picker-dropdown');
+
+    trigger.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isOpen = dropdown.classList.contains('open');
+        if (isOpen) {
+            closeDayDropdown();
+        } else {
+            dropdown.classList.add('open');
+            trigger.classList.add('open');
+        }
+    });
+
+    // Close when clicking outside
+    document.addEventListener('click', (e) => {
+        if (!document.getElementById('day-picker-trigger-wrap').contains(e.target)) {
+            closeDayDropdown();
+        }
+    });
+
+    // Close on Escape
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') closeDayDropdown();
     });
 }
 
@@ -350,47 +376,55 @@ const monthNamesAll = [
 
 function renderDayPicker() {
     const dayGrid = document.getElementById('day-grid');
-    const dayPickerLabel = document.getElementById('day-picker-label');
     const clearBtn = document.getElementById('day-clear-btn');
+    const triggerLabel = document.getElementById('day-picker-trigger-label');
+    const monthLabel = document.getElementById('day-picker-month-label');
+    const selectedMonth = monthSelect.value;
+
+    // Update trigger button label with selected day
+    if (activeDayRecord) {
+        const dp = activeDayRecord.date.split('-');
+        const d = parseInt(dp[2]);
+        const mIdx = parseInt(dp[1]) - 1;
+        const y = parseInt(dp[0]) + 543;
+        triggerLabel.textContent = `${d} ${monthNamesAll[mIdx]} ${y}`;
+    } else {
+        triggerLabel.textContent = 'เลือกวันที่...';
+    }
+
+    // Show/hide clear button
+    const isLatestDay = activeDayRecord && filteredRecords.length > 0 &&
+        activeDayRecord.date === filteredRecords[filteredRecords.length - 1].date;
+    clearBtn.style.display = (!isLatestDay && activeDayRecord) ? 'flex' : 'none';
 
     if (!filteredRecords || filteredRecords.length === 0) {
         dayGrid.innerHTML = '<span style="color:var(--text-muted);font-size:13px;">ไม่มีข้อมูลในเดือนนี้</span>';
-        clearBtn.style.display = 'none';
         return;
     }
 
-    // Build a map: day -> record
+    if (selectedMonth === 'all') {
+        dayGrid.innerHTML = `<span style="color:var(--text-muted);font-size:13px;">
+            <i class="fa-solid fa-info-circle"></i> กรุณาเลือกเดือนก่อน
+        </span>`;
+        monthLabel.textContent = 'เลือกเดือนก่อนเพื่อดูวัน';
+        return;
+    }
+
+    // Build day map
     const dayMap = {};
     filteredRecords.forEach(r => {
-        const day = parseInt(r.date.split('-')[2]);
-        dayMap[day] = r;
+        dayMap[parseInt(r.date.split('-')[2])] = r;
     });
 
-    // Get the month/year of filtered records
     const firstDate = filteredRecords[0].date.split('-');
     const monthIdx = parseInt(firstDate[1]) - 1;
     const year = parseInt(firstDate[0]);
     const daysInMonth = new Date(year, monthIdx + 1, 0).getDate();
 
-    // Update label
-    const selectedMonth = monthSelect.value;
-    if (selectedMonth === 'all') {
-        dayPickerLabel.innerHTML = '<i class="fa-regular fa-calendar-check"></i> เลือกวันที่ต้องการดูข้อมูล (แสดงทั้งปี — กรุณาเลือกเดือนก่อน):';
-    } else {
-        dayPickerLabel.innerHTML = `<i class="fa-regular fa-calendar-check"></i> เลือกวันที่ต้องการดูข้อมูล — <strong style="color:var(--color-water)">${monthNamesAll[monthIdx]} ${year + 543}</strong>:`;
-    }
+    // Dropdown header label
+    monthLabel.textContent = `${monthNamesAll[monthIdx]} ${year + 543}`;
 
-    // Show/hide clear button
-    const isLatestDay = activeDayRecord && activeDayRecord.date === filteredRecords[filteredRecords.length - 1].date;
-    clearBtn.style.display = !isLatestDay ? 'flex' : 'none';
-
-    // If 'all' selected — show a simple message instead of 365 buttons
-    if (selectedMonth === 'all') {
-        dayGrid.innerHTML = `<span style="color:var(--text-muted);font-size:13px;"><i class="fa-solid fa-info-circle"></i> กรุณาเลือกเดือนในตัวกรองด้านบนก่อน เพื่อแสดงปุ่มเลือกวัน</span>`;
-        return;
-    }
-
-    // Build day buttons 1..daysInMonth
+    // Build buttons
     let html = '';
     for (let d = 1; d <= daysInMonth; d++) {
         const rec = dayMap[d];
@@ -402,50 +436,58 @@ function renderDayPicker() {
 
         if (rec) {
             btnClass += ' has-data';
-            const yieldVal = rec.system_yield;
-            if (yieldVal === null || yieldVal === 0) {
+            const yVal = rec.system_yield;
+            if (!yVal || yVal === 0) {
                 btnClass += ' yield-na';
-                titleAttr = `${d}/${monthIdx+1}/${year+543} | ปริมาณน้ำ: ${formatNum(rec.water_qty)} ลบ.ม. | Yield: N/A`;
-            } else if (yieldVal >= CONTRACT_YIELD) {
+                titleAttr = `${d}/${monthIdx+1}/${year+543} | น้ำ: ${formatNum(rec.water_qty)} ลบ.ม. | Yield: N/A`;
+            } else if (yVal >= CONTRACT_YIELD) {
                 btnClass += ' yield-pass';
-                titleAttr = `${d}/${monthIdx+1}/${year+543} | ปริมาณน้ำ: ${formatNum(rec.water_qty)} ลบ.ม. | Yield: ${formatNum(yieldVal,2)}% ✓`;
+                titleAttr = `${d}/${monthIdx+1}/${year+543} | น้ำ: ${formatNum(rec.water_qty)} ลบ.ม. | Yield: ${formatNum(yVal,2)}% ✓`;
             } else {
                 btnClass += ' yield-fail';
-                titleAttr = `${d}/${monthIdx+1}/${year+543} | ปริมาณน้ำ: ${formatNum(rec.water_qty)} ลบ.ม. | Yield: ${formatNum(yieldVal,2)}% ✗`;
+                titleAttr = `${d}/${monthIdx+1}/${year+543} | น้ำ: ${formatNum(rec.water_qty)} ลบ.ม. | Yield: ${formatNum(yVal,2)}% ✗`;
             }
         } else {
             btnClass += ' no-data';
         }
-
         if (isActive) btnClass += ' active';
-
         html += `<button class="${btnClass}" data-date="${dateStr}" title="${titleAttr}">${d}</button>`;
     }
-
     dayGrid.innerHTML = html;
 
-    // Add click listeners
+    // Click listeners
     dayGrid.querySelectorAll('.day-btn:not(.no-data)').forEach(btn => {
         btn.addEventListener('click', () => {
-            const date = btn.dataset.date;
-            const rec = allRecords.find(r => r.date === date);
+            const rec = allRecords.find(r => r.date === btn.dataset.date);
             if (!rec) return;
-
             activeDayRecord = rec;
 
-            // Update active class
             dayGrid.querySelectorAll('.day-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
 
-            // Show/hide clear button
-            const isLastDay = activeDayRecord.date === filteredRecords[filteredRecords.length - 1].date;
-            document.getElementById('day-clear-btn').style.display = !isLastDay ? 'flex' : 'none';
+            // Update trigger label
+            const dp2 = rec.date.split('-');
+            const dNum = parseInt(dp2[2]);
+            const mIdx2 = parseInt(dp2[1]) - 1;
+            const y2 = parseInt(dp2[0]) + 543;
+            triggerLabel.textContent = `${dNum} ${monthNamesAll[mIdx2]} ${y2}`;
 
-            // Update KPIs and highlight table row
+            // Show clear btn
+            const isLast = activeDayRecord.date === filteredRecords[filteredRecords.length - 1].date;
+            clearBtn.style.display = !isLast ? 'flex' : 'none';
+
             updateKpiCards();
             highlightTableRow();
+            closeDayDropdown();
         });
     });
+}
+
+function closeDayDropdown() {
+    const dropdown = document.getElementById('day-picker-dropdown');
+    const trigger = document.getElementById('day-picker-trigger');
+    dropdown.classList.remove('open');
+    trigger.classList.remove('open');
 }
 
 // Highlight the active row in the daily table
