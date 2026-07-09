@@ -63,16 +63,36 @@
             </div>
         </header>
 
-        <!-- Day Picker Strip -->
+        <!-- Day Picker (Compact Dropdown) -->
         <section class="day-picker-section" id="day-picker-section">
-            <div class="day-picker-header">
-                <span id="day-picker-label"><i class="fa-regular fa-calendar-check"></i> เลือกวันที่ต้องการดูข้อมูล:</span>
+            <div class="day-picker-row">
+                <span class="day-picker-label-text">
+                    <i class="fa-regular fa-calendar-check"></i> วันที่ดูข้อมูล:
+                </span>
+
+                <!-- Trigger Button -->
+                <div class="day-picker-trigger-wrap" id="day-picker-trigger-wrap">
+                    <button class="day-picker-trigger" id="day-picker-trigger">
+                        <i class="fa-regular fa-calendar"></i>
+                        <span id="day-picker-trigger-label">เลือกวันที่...</span>
+                        <i class="fa-solid fa-chevron-down" id="day-picker-chevron"></i>
+                    </button>
+
+                    <!-- Dropdown Popup -->
+                    <div class="day-picker-dropdown" id="day-picker-dropdown">
+                        <div class="day-picker-dropdown-header">
+                            <span id="day-picker-month-label">เดือน</span>
+                        </div>
+                        <div class="day-grid" id="day-grid">
+                            <!-- Day buttons rendered dynamically -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Clear Button -->
                 <button class="day-clear-btn" id="day-clear-btn" style="display:none;">
-                    <i class="fa-solid fa-rotate-left"></i> ล้างการเลือก (แสดงวันล่าสุด)
+                    <i class="fa-solid fa-rotate-left"></i> ล้างการเลือก
                 </button>
-            </div>
-            <div class="day-grid" id="day-grid">
-                <!-- Day buttons rendered dynamically by app.js -->
             </div>
         </section>
 
