@@ -11,9 +11,7 @@ let activeDayRecord = null;
 let activeRangeRecords = []; // List of records in the currently selected date range
 let rangeStartDay = null;    // Day number (1-31) of the range start
 let rangeEndDay = null;      // Day number (1-31) of the range end
-let isDraggingRange = false; // Mouse drag state
-let clickSelectStart = null; // Click-click start day
-let clickSelectEnd = null;   // Click-click end day
+let clickSelectStart = null; // Click-click selection start day
 
 // DOM Elements
 const monthSelect = document.getElementById('month-select');
@@ -367,16 +365,6 @@ function setupEventListeners() {
         }
     });
 
-    // Global mouseup to release drag select
-    document.addEventListener('mouseup', () => {
-        if (isDraggingRange) {
-            isDraggingRange = false;
-            if (rangeStartDay !== null && rangeEndDay !== null) {
-                finalizeRangeSelection(rangeStartDay, rangeEndDay);
-            }
-        }
-    });
-
     // Close on Escape
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') closeDayDropdown();
@@ -551,62 +539,45 @@ function renderDayPicker() {
             updateRangeVisuals(activeDay, activeDay);
         }
 
-        // Add mouse / touch listeners for range dragging and click-click selecting
+        // Add click / mouseenter / mouseleave listeners for click-click range selecting
         const buttons = dayGrid.querySelectorAll('.day-btn:not(.no-data)');
         buttons.forEach(btn => {
             const day = parseInt(btn.textContent);
 
-            // Mousedown/Touchstart -> Start drag-select
-            btn.addEventListener('mousedown', (e) => {
-                e.preventDefault();
-                isDraggingRange = true;
-                rangeStartDay = day;
-                rangeEndDay = day;
-                updateRangeVisuals(rangeStartDay, rangeEndDay);
-            });
-
-            // Touchstart for mobile (just acts like a click select)
-            btn.addEventListener('touchstart', () => {
-                if (clickSelectStart === null) {
-                    clickSelectStart = day;
-                    updateRangeVisuals(day, day);
-                } else {
-                    finalizeRangeSelection(clickSelectStart, day);
-                }
-            }, { passive: true });
-
-            // Mouseenter -> Preview drag range or click-click preview
+            // Mouseenter -> Preview click-click range
             btn.addEventListener('mouseenter', () => {
-                if (isDraggingRange) {
-                    rangeEndDay = day;
-                    updateRangeVisuals(rangeStartDay, rangeEndDay);
-                } else if (clickSelectStart !== null) {
+                if (clickSelectStart !== null) {
                     updateRangeVisuals(clickSelectStart, day);
                 }
             });
 
-            // Mouseup -> Finalize selection
-            btn.addEventListener('mouseup', () => {
-                if (isDraggingRange) {
-                    isDraggingRange = false;
-                    if (rangeStartDay !== rangeEndDay) {
-                        // Drag selection complete
-                        finalizeRangeSelection(rangeStartDay, rangeEndDay);
+            // Click -> Select start, then select end or single day
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation(); // prevent closing dropdown
+                
+                if (clickSelectStart === null) {
+                    // First click: select start day
+                    clickSelectStart = day;
+                    updateRangeVisuals(day, day);
+                } else {
+                    // Second click: finalize range or single day selection
+                    if (day === clickSelectStart) {
+                        // Double click same day: select single day
+                        finalizeRangeSelection(day, day);
                     } else {
-                        // Single click -> run click-click logic
-                        if (clickSelectStart === null) {
-                            clickSelectStart = day;
-                            updateRangeVisuals(day, day);
-                        } else if (clickSelectStart === day) {
-                            // Clicked same day again -> single day selection
-                            finalizeRangeSelection(day, day);
-                        } else {
-                            // Clicked different day -> range selection
-                            finalizeRangeSelection(clickSelectStart, day);
-                        }
+                        // Click different day: select range
+                        finalizeRangeSelection(clickSelectStart, day);
                     }
+                    clickSelectStart = null;
                 }
             });
+        });
+
+        // Mouseleave -> Restore visual state to show only start day if not finalized
+        dayGrid.addEventListener('mouseleave', () => {
+            if (clickSelectStart !== null) {
+                updateRangeVisuals(clickSelectStart, clickSelectStart);
+            }
         });
     }
 }
@@ -616,6 +587,10 @@ function closeDayDropdown() {
     const trigger = document.getElementById('day-picker-trigger');
     if (dropdown) dropdown.classList.remove('open');
     if (trigger) trigger.classList.remove('open');
+    
+    // Reset click-click selection state if they closed the dropdown without making the second click
+    clickSelectStart = null;
+    renderDayPicker();
 }
 
 // อัปเดตคลาสแสดงผลช่วงวันที่เลือกในปฏิทิน
@@ -704,17 +679,8 @@ function highlightTableRow() {
         } else if (activeDayRecord && row.dataset.date === activeDayRecord.date) {
             row.classList.add('highlight-row');
             row.style.backgroundColor = 'rgba(0, 210, 255, 0.08)';
-            row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
     });
-
-    // If range, scroll the first row of range into view
-    if (isRange && activeRangeRecords.length > 0) {
-        const firstRow = tableBodyEl.querySelector(`tr[data-date="${activeRangeRecords[0].date}"]`);
-        if (firstRow) {
-            firstRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        }
-    }
 }
 
 // Calculate and Update KPI Card Metrics
