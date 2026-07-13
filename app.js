@@ -192,8 +192,9 @@ function csvToRecords(csvText) {
 
 // Main data loader: Live Google Sheet → fallback data.js
 async function fetchData() {
-    if (tableBody) {
-        tableBody.innerHTML = `<tr><td colspan="13" class="loading-text"><i class="fa-solid fa-spinner fa-spin"></i> กำลังดึงข้อมูลจาก Google Sheet...</td></tr>`;
+    const tableBodyEl = document.getElementById('table-body');
+    if (tableBodyEl) {
+        tableBodyEl.innerHTML = `<tr><td colspan="13" class="loading-text"><i class="fa-solid fa-spinner fa-spin"></i> กำลังดึงข้อมูลจาก Google Sheet...</td></tr>`;
     }
 
     // 1) ลองดึง Live CSV จาก Google Sheets
@@ -207,6 +208,7 @@ async function fetchData() {
         allRecords = records;
         allRecords.sort((a, b) => new Date(a.date) - new Date(b.date));
         console.log(`✅ Live: โหลดข้อมูล ${allRecords.length} แถวจาก Google Sheet`);
+        setDefaultMonthAndActiveDay();
         showDataSourceBadge('live');
         filterAndProcessData();
         return;
@@ -222,16 +224,35 @@ async function fetchData() {
         allRecords = [...allRecordsData];
         allRecords.sort((a, b) => new Date(a.date) - new Date(b.date));
         console.log(`📦 Offline: โหลดข้อมูล ${allRecords.length} แถวจาก data.js`);
+        setDefaultMonthAndActiveDay();
         showDataSourceBadge('static');
         filterAndProcessData();
     } catch (error) {
         console.error('Error:', error);
-        if (tableBody) {
-            tableBody.innerHTML = `<tr><td colspan="13" class="loading-text" style="color:var(--color-kpi-fail);">
+        if (tableBodyEl) {
+            tableBodyEl.innerHTML = `<tr><td colspan="13" class="loading-text" style="color:var(--color-kpi-fail);">
                 <i class="fa-solid fa-triangle-exclamation"></i> โหลดข้อมูลไม่ได้: ${error.message}<br>
                 <small>กรุณาตั้งค่า Google Sheet ให้เป็น "Anyone with link can view"</small>
             </td></tr>`;
         }
+    }
+}
+
+// ตั้งค่าเริ่มต้นของเดือนและวันเป็นข้อมูลล่าสุดที่มีการอัปเดตจริง
+function setDefaultMonthAndActiveDay() {
+    if (!allRecords || allRecords.length === 0) return;
+
+    // ค้นหาแถวล่าสุดที่มีข้อมูลการใช้งานจริง (ปริมาณน้ำ > 0 หรือ System Yield ไม่เป็น null)
+    const recordsWithData = allRecords.filter(r => r.water_qty > 0 || (r.system_yield !== null && r.system_yield > 0));
+    const latestRecord = recordsWithData.length > 0 ? recordsWithData[recordsWithData.length - 1] : allRecords[allRecords.length - 1];
+
+    if (latestRecord) {
+        const latestMonth = latestRecord.date.split('-')[1]; // ดึงเดือน เช่น "07"
+        const monthSelectEl = document.getElementById('month-select');
+        if (monthSelectEl) {
+            monthSelectEl.value = latestMonth;
+        }
+        activeDayRecord = latestRecord;
     }
 }
 
@@ -371,9 +392,13 @@ function filterAndProcessData() {
         }
     }
 
-    // Set default active day (latest day in filtered records)
+    // Set default active day (latest day in filtered records that has data)
     if (filteredRecords.length > 0) {
-        activeDayRecord = filteredRecords[filteredRecords.length - 1];
+        const hasActiveInFiltered = activeDayRecord && filteredRecords.some(r => r.date === activeDayRecord.date);
+        if (!hasActiveInFiltered) {
+            const filteredWithData = filteredRecords.filter(r => r.water_qty > 0 || (r.system_yield !== null && r.system_yield > 0));
+            activeDayRecord = filteredWithData.length > 0 ? filteredWithData[filteredWithData.length - 1] : filteredRecords[filteredRecords.length - 1];
+        }
     } else {
         activeDayRecord = null;
     }
