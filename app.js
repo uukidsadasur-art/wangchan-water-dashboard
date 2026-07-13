@@ -8,6 +8,12 @@ let allRecords = [];
 let filteredRecords = [];
 let charts = {};
 let activeDayRecord = null;
+let activeRangeRecords = []; // List of records in the currently selected date range
+let rangeStartDay = null;    // Day number (1-31) of the range start
+let rangeEndDay = null;      // Day number (1-31) of the range end
+let isDraggingRange = false; // Mouse drag state
+let clickSelectStart = null; // Click-click start day
+let clickSelectEnd = null;   // Click-click end day
 
 // DOM Elements
 const monthSelect = document.getElementById('month-select');
@@ -328,6 +334,11 @@ function setupEventListeners() {
         dayClearBtnEl.addEventListener('click', () => {
             if (filteredRecords.length > 0) {
                 activeDayRecord = filteredRecords[filteredRecords.length - 1];
+                activeRangeRecords = [activeDayRecord];
+                rangeStartDay = null;
+                rangeEndDay = null;
+                clickSelectStart = null;
+                clickSelectEnd = null;
             }
             renderDayPicker();
             updateKpiCards();
@@ -353,6 +364,16 @@ function setupEventListeners() {
         const wrap = document.getElementById('day-picker-trigger-wrap');
         if (wrap && !wrap.contains(e.target)) {
             closeDayDropdown();
+        }
+    });
+
+    // Global mouseup to release drag select
+    document.addEventListener('mouseup', () => {
+        if (isDraggingRange) {
+            isDraggingRange = false;
+            if (rangeStartDay !== null && rangeEndDay !== null) {
+                finalizeRangeSelection(rangeStartDay, rangeEndDay);
+            }
         }
     });
 
@@ -398,9 +419,15 @@ function filterAndProcessData() {
         if (!hasActiveInFiltered) {
             const filteredWithData = filteredRecords.filter(r => r.water_qty > 0 || (r.system_yield !== null && r.system_yield > 0));
             activeDayRecord = filteredWithData.length > 0 ? filteredWithData[filteredWithData.length - 1] : filteredRecords[filteredRecords.length - 1];
+            activeRangeRecords = [activeDayRecord];
+            rangeStartDay = null;
+            rangeEndDay = null;
+            clickSelectStart = null;
+            clickSelectEnd = null;
         }
     } else {
         activeDayRecord = null;
+        activeRangeRecords = [];
     }
 
     // 2. Render Day Picker
@@ -514,34 +541,71 @@ function renderDayPicker() {
     if (dayGrid) {
         dayGrid.innerHTML = html;
 
-        // Click listeners
-        dayGrid.querySelectorAll('.day-btn:not(.no-data)').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const rec = allRecords.find(r => r.date === btn.dataset.date);
-                if (!rec) return;
-                activeDayRecord = rec;
+        // Apply range visual highlights based on current range selection
+        if (activeRangeRecords && activeRangeRecords.length > 1) {
+            const startDay = parseInt(activeRangeRecords[0].date.split('-')[2]);
+            const endDay = parseInt(activeRangeRecords[activeRangeRecords.length - 1].date.split('-')[2]);
+            updateRangeVisuals(startDay, endDay);
+        } else if (activeDayRecord) {
+            const activeDay = parseInt(activeDayRecord.date.split('-')[2]);
+            updateRangeVisuals(activeDay, activeDay);
+        }
 
-                dayGrid.querySelectorAll('.day-btn').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
+        // Add mouse / touch listeners for range dragging and click-click selecting
+        const buttons = dayGrid.querySelectorAll('.day-btn:not(.no-data)');
+        buttons.forEach(btn => {
+            const day = parseInt(btn.textContent);
 
-                // Update trigger label
-                if (triggerLabel) {
-                    const dp2 = rec.date.split('-');
-                    const dNum = parseInt(dp2[2]);
-                    const mIdx2 = parseInt(dp2[1]) - 1;
-                    const y2 = parseInt(dp2[0]) + 543;
-                    triggerLabel.textContent = `${dNum} ${monthNamesAll[mIdx2]} ${y2}`;
+            // Mousedown/Touchstart -> Start drag-select
+            btn.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                isDraggingRange = true;
+                rangeStartDay = day;
+                rangeEndDay = day;
+                updateRangeVisuals(rangeStartDay, rangeEndDay);
+            });
+
+            // Touchstart for mobile (just acts like a click select)
+            btn.addEventListener('touchstart', () => {
+                if (clickSelectStart === null) {
+                    clickSelectStart = day;
+                    updateRangeVisuals(day, day);
+                } else {
+                    finalizeRangeSelection(clickSelectStart, day);
                 }
+            }, { passive: true });
 
-                // Show clear btn
-                if (clearBtn) {
-                    const isLast = activeDayRecord.date === filteredRecords[filteredRecords.length - 1].date;
-                    clearBtn.style.display = !isLast ? 'flex' : 'none';
+            // Mouseenter -> Preview drag range or click-click preview
+            btn.addEventListener('mouseenter', () => {
+                if (isDraggingRange) {
+                    rangeEndDay = day;
+                    updateRangeVisuals(rangeStartDay, rangeEndDay);
+                } else if (clickSelectStart !== null) {
+                    updateRangeVisuals(clickSelectStart, day);
                 }
+            });
 
-                updateKpiCards();
-                highlightTableRow();
-                closeDayDropdown();
+            // Mouseup -> Finalize selection
+            btn.addEventListener('mouseup', () => {
+                if (isDraggingRange) {
+                    isDraggingRange = false;
+                    if (rangeStartDay !== rangeEndDay) {
+                        // Drag selection complete
+                        finalizeRangeSelection(rangeStartDay, rangeEndDay);
+                    } else {
+                        // Single click -> run click-click logic
+                        if (clickSelectStart === null) {
+                            clickSelectStart = day;
+                            updateRangeVisuals(day, day);
+                        } else if (clickSelectStart === day) {
+                            // Clicked same day again -> single day selection
+                            finalizeRangeSelection(day, day);
+                        } else {
+                            // Clicked different day -> range selection
+                            finalizeRangeSelection(clickSelectStart, day);
+                        }
+                    }
+                }
             });
         });
     }
@@ -554,19 +618,103 @@ function closeDayDropdown() {
     if (trigger) trigger.classList.remove('open');
 }
 
+// อัปเดตคลาสแสดงผลช่วงวันที่เลือกในปฏิทิน
+function updateRangeVisuals(start, end) {
+    const dayGrid = document.getElementById('day-grid');
+    if (!dayGrid) return;
+    const buttons = dayGrid.querySelectorAll('.day-btn:not(.no-data)');
+    
+    if (start === null) {
+        buttons.forEach(btn => {
+            btn.classList.remove('active', 'active-start', 'active-end', 'active-range');
+        });
+        return;
+    }
+
+    const min = end !== null ? Math.min(start, end) : start;
+    const max = end !== null ? Math.max(start, end) : start;
+    
+    buttons.forEach(btn => {
+        const day = parseInt(btn.textContent);
+        btn.classList.remove('active', 'active-start', 'active-end', 'active-range');
+        
+        if (min === max) {
+            if (day === min) btn.classList.add('active');
+        } else {
+            if (day === min) btn.classList.add('active-start');
+            else if (day === max) btn.classList.add('active-end');
+            else if (day > min && day < max) btn.classList.add('active-range');
+        }
+    });
+}
+
+// จัดเก็บข้อมูลของช่วงวันที่ถูกเลือกให้เป็นปัจจุบันและอัปเดตหน้า Dashboard
+function finalizeRangeSelection(start, end) {
+    if (!filteredRecords || filteredRecords.length === 0) return;
+    
+    const min = Math.min(start, end);
+    const max = Math.max(start, end);
+    
+    activeRangeRecords = filteredRecords.filter(r => {
+        const d = parseInt(r.date.split('-')[2]);
+        return d >= min && d <= max;
+    });
+
+    if (activeRangeRecords.length > 0) {
+        activeDayRecord = activeRangeRecords[activeRangeRecords.length - 1];
+        
+        rangeStartDay = min;
+        rangeEndDay = max;
+        clickSelectStart = null;
+        clickSelectEnd = null;
+        
+        renderDayPicker();
+        updateKpiCards();
+        highlightTableRow();
+        
+        // Show/hide clear button
+        const clearBtn = document.getElementById('day-clear-btn');
+        if (clearBtn) {
+            const isLast = activeDayRecord.date === filteredRecords[filteredRecords.length - 1].date;
+            clearBtn.style.display = (!isLast || activeRangeRecords.length > 1) ? 'flex' : 'none';
+        }
+        
+        setTimeout(closeDayDropdown, 180);
+    }
+}
+
 // Highlight the active row in the daily table
 function highlightTableRow() {
-    if (!activeDayRecord) return;
     const tableBodyEl = document.getElementById('table-body');
     if (!tableBodyEl) return;
     const rows = tableBodyEl.querySelectorAll('tr');
+    
+    const isRange = activeRangeRecords && activeRangeRecords.length > 1;
+    
     rows.forEach(row => {
         row.classList.remove('highlight-row');
-        if (row.dataset.date === activeDayRecord.date) {
+        row.style.backgroundColor = ''; // clear inline styling
+        
+        if (isRange) {
+            const inRange = activeRangeRecords.some(r => r.date === row.dataset.date);
+            if (inRange) {
+                row.classList.add('highlight-row');
+                row.style.backgroundColor = 'rgba(0, 210, 255, 0.05)';
+            }
+        } else if (activeDayRecord && row.dataset.date === activeDayRecord.date) {
             row.classList.add('highlight-row');
+            row.style.backgroundColor = 'rgba(0, 210, 255, 0.08)';
             row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
     });
+
+    // If range, scroll the first row of range into view
+    if (isRange && activeRangeRecords.length > 0) {
+        const firstRow = tableBodyEl.querySelector(`tr[data-date="${activeRangeRecords[0].date}"]`);
+        if (firstRow) {
+            firstRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+    }
 }
 
 // Calculate and Update KPI Card Metrics
@@ -575,6 +723,8 @@ function updateKpiCards() {
         clearKpiCards();
         return;
     }
+
+    const isRange = activeRangeRecords && activeRangeRecords.length > 1;
 
     // A. Yearly calculation (always constant across the 2026 data set)
     const yearWaterAcc = allRecords.reduce((sum, r) => sum + r.water_qty, 0);
@@ -611,90 +761,182 @@ function updateKpiCards() {
     const monthTotalRecords = monthRecords.filter(r => r.total_cost_m3 > 0);
     const monthTotalAvg = monthTotalRecords.reduce((sum, r) => sum + r.total_cost_m3, 0) / (monthTotalRecords.length || 1);
 
+    // C. Range calculations if range selected
+    let rangeWaterSum = 0;
+    let rangeWaterAvg = 0;
+    let rangeYieldAvg = 0;
+    let rangeChemAvg = 0;
+    let rangeElecAvg = 0;
+    let rangeTotalAvg = 0;
+
+    if (isRange) {
+        rangeWaterSum = activeRangeRecords.reduce((sum, r) => sum + r.water_qty, 0);
+        rangeWaterAvg = rangeWaterSum / activeRangeRecords.length;
+        
+        const rangeYieldRecs = activeRangeRecords.filter(r => r.system_yield !== null && r.system_yield > 0);
+        rangeYieldAvg = rangeYieldRecs.reduce((sum, r) => sum + r.system_yield, 0) / (rangeYieldRecs.length || 1);
+
+        const rangeChemRecs = activeRangeRecords.filter(r => r.chem_cost_m3 > 0);
+        rangeChemAvg = rangeChemRecs.reduce((sum, r) => sum + r.chem_cost_m3, 0) / (rangeChemRecs.length || 1);
+
+        const rangeElecRecs = activeRangeRecords.filter(r => r.elec_cost_m3 > 0);
+        rangeElecAvg = rangeElecRecs.reduce((sum, r) => sum + r.elec_cost_m3, 0) / (rangeElecRecs.length || 1);
+
+        const rangeTotalRecs = activeRangeRecords.filter(r => r.total_cost_m3 > 0);
+        rangeTotalAvg = rangeTotalRecs.reduce((sum, r) => sum + r.total_cost_m3, 0) / (rangeTotalRecs.length || 1);
+    }
+
     // Helper to set text content safely
     function setTxt(id, val) {
         const el = document.getElementById(id);
         if (el) el.innerText = val;
     }
 
-    // C. Update DOM
+    // D. Update KPI Cards Title based on state
+    const waterCardTitle = document.querySelector('#kpi-water h3');
+    const yieldCardTitle = document.querySelector('#kpi-yield h3');
+    const chemCardTitle = document.querySelector('#kpi-chem-cost h3');
+    const elecCardTitle = document.querySelector('#kpi-elec-cost h3');
+    const totalCardTitle = document.querySelector('#kpi-total-cost h3');
+
+    if (isRange) {
+        if (waterCardTitle) waterCardTitle.innerHTML = 'ผลรวมปริมาณน้ำจ่าย <span style="font-size:11px;color:var(--text-muted);font-weight:normal;">(ช่วงที่เลือก)</span>';
+        if (yieldCardTitle) yieldCardTitle.innerHTML = 'System Yield เฉลี่ย <span style="font-size:11px;color:var(--text-muted);font-weight:normal;">(ช่วงที่เลือก)</span>';
+        if (chemCardTitle) chemCardTitle.innerHTML = 'ต้นทุนเคมีเฉลี่ย <span style="font-size:11px;color:var(--text-muted);font-weight:normal;">(ช่วงที่เลือก)</span>';
+        if (elecCardTitle) elecCardTitle.innerHTML = 'ต้นทุนไฟฟ้าเฉลี่ย <span style="font-size:11px;color:var(--text-muted);font-weight:normal;">(ช่วงที่เลือก)</span>';
+        if (totalCardTitle) totalCardTitle.innerHTML = 'ต้นทุนรวมเฉลี่ย <span style="font-size:11px;color:var(--text-muted);font-weight:normal;">(ช่วงที่เลือก)</span>';
+    } else {
+        if (waterCardTitle) waterCardTitle.innerHTML = 'ปริมาณน้ำจ่าย';
+        if (yieldCardTitle) yieldCardTitle.innerHTML = 'System Yield';
+        if (chemCardTitle) chemCardTitle.innerHTML = 'ต้นทุนสารเคมี';
+        if (elecCardTitle) elecCardTitle.innerHTML = 'ต้นทุนไฟฟ้า';
+        if (totalCardTitle) totalCardTitle.innerHTML = 'ต้นทุนรวม (เคมี + ไฟฟ้า)';
+    }
+
+    // E. Update DOM
     // 1. Water Qty
-    setTxt('water-daily', formatNum(activeDayRecord.water_qty));
+    const waterVal = isRange ? rangeWaterSum : activeDayRecord.water_qty;
+    setTxt('water-daily', formatNum(waterVal));
     setTxt('water-month-acc', formatNum(monthWaterAcc) + ' ลบ.ม.');
     setTxt('water-month-avg', formatNum(monthWaterAvg, 1) + ' ลบ.ม./วัน');
     setTxt('water-year-acc', formatNum(yearWaterAcc) + ' ลบ.ม.');
     setTxt('water-year-avg', formatNum(yearWaterAvg, 1) + ' ลบ.ม./วัน');
 
     // 2. System Yield
-    const yieldDaily = activeDayRecord.system_yield;
-    const yieldDailyTxt = yieldDaily !== null ? formatNum(yieldDaily, 2) : '-';
+    const yieldVal = isRange ? rangeYieldAvg : activeDayRecord.system_yield;
+    const yieldDailyTxt = yieldVal !== null ? formatNum(yieldVal, 2) : '-';
     setTxt('yield-daily', yieldDailyTxt);
     setTxt('yield-month-avg', formatNum(monthYieldAvg, 2) + ' %');
     setTxt('yield-year-avg', formatNum(yearYieldAvg, 2) + ' %');
     
     // Check Yield KPI tag
     const yieldCard = document.getElementById('kpi-yield');
-    if (yieldCard && yieldDaily !== null) {
+    if (yieldCard && yieldVal !== null) {
         const tag = yieldCard.querySelector('.kpi-target-tag');
         if (tag) {
-            if (yieldDaily >= CONTRACT_YIELD) {
+            if (yieldVal >= CONTRACT_YIELD) {
                 tag.className = 'kpi-target-tag kpi-pass';
-                tag.innerHTML = '<i class="fa-solid fa-check"></i> ได้ตามข้อกำหนดสัญญา (&ge; 97%)';
+                tag.innerHTML = `<i class="fa-solid fa-check"></i> ${isRange ? 'เฉลี่ย' : ''}ได้ตามข้อกำหนดสัญญา (&ge; 97%)`;
             } else {
                 tag.className = 'kpi-target-tag kpi-fail';
-                tag.innerHTML = '<i class="fa-solid fa-xmark"></i> ต่ำกว่าข้อกำหนดสัญญา (&lt; 97%)';
+                tag.innerHTML = `<i class="fa-solid fa-xmark"></i> ${isRange ? 'เฉลี่ย' : ''}ต่ำกว่าข้อกำหนดสัญญา (&lt; 97%)`;
             }
         }
     }
 
     // 3. Chemical Cost/m3
-    setTxt('chem-cost-daily', formatNum(activeDayRecord.chem_cost_m3, 2));
+    const chemVal = isRange ? rangeChemAvg : activeDayRecord.chem_cost_m3;
+    setTxt('chem-cost-daily', formatNum(chemVal, 2));
     setTxt('chem-cost-month-avg', formatNum(monthChemAvg, 2) + ' บาท/ลบ.ม.');
     setTxt('chem-cost-year-avg', formatNum(yearChemAvg, 2) + ' บาท/ลบ.ม.');
     
     // Check Chem Cost KPI
     const chemTag = document.getElementById('kpi-tag-chem');
     if (chemTag) {
-        if (activeDayRecord.chem_cost_m3 <= KPI_CHEM) {
+        if (chemVal <= KPI_CHEM) {
             chemTag.className = 'kpi-target-tag kpi-pass';
-            chemTag.innerHTML = `<i class="fa-solid fa-check"></i> ได้ตาม KPI (&le; ${KPI_CHEM})`;
+            chemTag.innerHTML = `<i class="fa-solid fa-check"></i> ${isRange ? 'เฉลี่ย' : ''}ได้ตาม KPI (&le; ${KPI_CHEM})`;
         } else {
             chemTag.className = 'kpi-target-tag kpi-fail';
-            chemTag.innerHTML = `<i class="fa-solid fa-xmark"></i> เกิน KPI (&gt; ${KPI_CHEM})`;
+            chemTag.innerHTML = `<i class="fa-solid fa-xmark"></i> ${isRange ? 'เฉลี่ย' : ''}เกิน KPI (&gt; ${KPI_CHEM})`;
         }
     }
 
     // 4. Electricity Cost/m3
-    setTxt('elec-cost-daily', formatNum(activeDayRecord.elec_cost_m3, 2));
+    const elecVal = isRange ? rangeElecAvg : activeDayRecord.elec_cost_m3;
+    setTxt('elec-cost-daily', formatNum(elecVal, 2));
     setTxt('elec-cost-month-avg', formatNum(monthElecAvg, 2) + ' บาท/ลบ.ม.');
     setTxt('elec-cost-year-avg', formatNum(yearElecAvg, 2) + ' บาท/ลบ.ม.');
     
     // Check Elec Cost KPI
     const elecTag = document.getElementById('kpi-tag-elec');
     if (elecTag) {
-        if (activeDayRecord.elec_cost_m3 <= KPI_ELEC) {
+        if (elecVal <= KPI_ELEC) {
             elecTag.className = 'kpi-target-tag kpi-pass';
-            elecTag.innerHTML = `<i class="fa-solid fa-check"></i> ได้ตาม KPI (&le; ${KPI_ELEC})`;
+            elecTag.innerHTML = `<i class="fa-solid fa-check"></i> ${isRange ? 'เฉลี่ย' : ''}ได้ตาม KPI (&le; ${KPI_ELEC})`;
         } else {
             elecTag.className = 'kpi-target-tag kpi-fail';
-            elecTag.innerHTML = `<i class="fa-solid fa-xmark"></i> เกิน KPI (&gt; ${KPI_ELEC})`;
+            elecTag.innerHTML = `<i class="fa-solid fa-xmark"></i> ${isRange ? 'เฉลี่ย' : ''}เกิน KPI (&gt; ${KPI_ELEC})`;
         }
     }
 
     // 5. Total Cost/m3
-    setTxt('total-cost-daily', formatNum(activeDayRecord.total_cost_m3, 2));
+    const totalVal = isRange ? rangeTotalAvg : activeDayRecord.total_cost_m3;
+    setTxt('total-cost-daily', formatNum(totalVal, 2));
     setTxt('total-cost-month-avg', formatNum(monthTotalAvg, 2) + ' บาท/ลบ.ม.');
     setTxt('total-cost-year-avg', formatNum(yearTotalAvg, 2) + ' บาท/ลบ.ม.');
     
     // Check Total Cost KPI
     const totalTag = document.getElementById('kpi-tag-total');
     if (totalTag) {
-        if (activeDayRecord.total_cost_m3 <= KPI_TOTAL) {
+        if (totalVal <= KPI_TOTAL) {
             totalTag.className = 'kpi-target-tag kpi-pass';
-            totalTag.innerHTML = `<i class="fa-solid fa-check"></i> ได้ตาม KPI (&le; ${KPI_TOTAL})`;
+            totalTag.innerHTML = `<i class="fa-solid fa-check"></i> ${isRange ? 'เฉลี่ย' : ''}ได้ตาม KPI (&le; ${KPI_TOTAL})`;
         } else {
             totalTag.className = 'kpi-target-tag kpi-fail';
-            totalTag.innerHTML = `<i class="fa-solid fa-xmark"></i> เกิน KPI (&gt; ${KPI_TOTAL})`;
+            totalTag.innerHTML = `<i class="fa-solid fa-xmark"></i> ${isRange ? 'เฉลี่ย' : ''}เกิน KPI (&gt; ${KPI_TOTAL})`;
+        }
+    }
+
+    // F. Update Range Info Banner in UI
+    const rangeBanner = document.getElementById('range-summary-banner');
+    if (rangeBanner) {
+        if (isRange) {
+            rangeBanner.style.display = 'flex';
+            
+            const startRec = activeRangeRecords[0];
+            const endRec = activeRangeRecords[activeRangeRecords.length - 1];
+            
+            const startParts = startRec.date.split('-');
+            const endParts = endRec.date.split('-');
+            
+            const monthNamesAbbr = [
+                'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
+                'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'
+            ];
+            
+            const startDay = parseInt(startParts[2]);
+            const startMonth = monthNamesAbbr[parseInt(startParts[1]) - 1];
+            const startYear = parseInt(startParts[0]) + 543;
+            
+            const endDay = parseInt(endParts[2]);
+            const endMonth = monthNamesAbbr[parseInt(endParts[1]) - 1];
+            const endYear = parseInt(endParts[0]) + 543;
+            
+            let rangeText = '';
+            if (startParts[1] === endParts[1]) {
+                rangeText = `${startDay} - ${endDay} ${startMonth} ${startYear}`;
+            } else {
+                rangeText = `${startDay} ${startMonth} - ${endDay} ${endMonth} ${startYear}`;
+            }
+            
+            document.getElementById('range-text-display').textContent = rangeText;
+            document.getElementById('range-days-count').textContent = activeRangeRecords.length;
+            document.getElementById('range-water-sum').textContent = formatNum(rangeWaterSum);
+            document.getElementById('range-water-avg').textContent = formatNum(rangeWaterAvg, 1);
+            document.getElementById('range-yield-avg').textContent = rangeYieldAvg !== null ? formatNum(rangeYieldAvg, 2) : '-';
+        } else {
+            rangeBanner.style.display = 'none';
         }
     }
 
