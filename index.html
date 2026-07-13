@@ -80,8 +80,9 @@
 
                     <!-- Dropdown Popup -->
                     <div class="day-picker-dropdown" id="day-picker-dropdown">
-                        <div class="day-picker-dropdown-header">
+                        <div class="day-picker-dropdown-header" style="display:flex; justify-content:space-between; align-items:center;">
                             <span id="day-picker-month-label">เดือน</span>
+                            <span style="font-size:11px; color:var(--text-muted); text-transform:none; font-weight:normal; font-family:'Sarabun', sans-serif;"><i class="fa-solid fa-mouse-pointer"></i> ลากเมาส์คลุมเพื่อเลือกช่วงวันได้</span>
                         </div>
                         <div class="day-grid" id="day-grid">
                             <!-- Day buttons rendered dynamically -->
@@ -93,6 +94,16 @@
                 <button class="day-clear-btn" id="day-clear-btn" style="display:none;">
                     <i class="fa-solid fa-rotate-left"></i> ล้างการเลือก
                 </button>
+            </div>
+
+            <!-- Range Summary Info Banner -->
+            <div class="range-summary-banner" id="range-summary-banner" style="display:none;">
+                <i class="fa-solid fa-circle-info"></i>
+                <span class="range-banner-text">
+                    แสดงสถิติช่วงวันที่ <strong id="range-text-display">-</strong> (รวม <strong id="range-days-count">-</strong> วัน):
+                    &nbsp;&nbsp;•&nbsp;&nbsp;ผลรวมปริมาณน้ำ: <strong id="range-water-sum">-</strong> ลบ.ม. (เฉลี่ย <strong id="range-water-avg">-</strong> ลบ.ม./วัน)
+                    &nbsp;&nbsp;•&nbsp;&nbsp;Yield เฉลี่ย: <strong id="range-yield-avg">-</strong>%
+                </span>
             </div>
         </section>
 
