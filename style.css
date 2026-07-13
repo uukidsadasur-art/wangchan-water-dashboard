@@ -890,6 +890,43 @@ body {
     transform: scale(1.08);
 }
 
+/* --- Range Selection Visual States --- */
+.day-btn.active-start {
+    background: linear-gradient(135deg, var(--color-water-dark), var(--color-water)) !important;
+    border-color: var(--color-water) !important;
+    color: #fff !important;
+    border-top-right-radius: 0 !important;
+    border-bottom-right-radius: 0 !important;
+    border-top-left-radius: 9px !important;
+    border-bottom-left-radius: 9px !important;
+    box-shadow: -4px 0 10px rgba(0, 210, 255, 0.25);
+    transform: scale(1.05);
+    z-index: 2;
+}
+
+.day-btn.active-end {
+    background: linear-gradient(135deg, var(--color-water-dark), var(--color-water)) !important;
+    border-color: var(--color-water) !important;
+    color: #fff !important;
+    border-top-left-radius: 0 !important;
+    border-bottom-left-radius: 0 !important;
+    border-top-right-radius: 9px !important;
+    border-bottom-right-radius: 9px !important;
+    box-shadow: 4px 0 10px rgba(0, 210, 255, 0.25);
+    transform: scale(1.05);
+    z-index: 2;
+}
+
+.day-btn.active-range {
+    background: rgba(0, 210, 255, 0.15) !important;
+    border-color: rgba(0, 210, 255, 0.3) !important;
+    color: var(--color-water) !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    transform: none !important;
+    z-index: 1;
+}
+
 .day-btn:disabled,
 .day-btn.no-data {
     opacity: 0.2;
@@ -917,4 +954,35 @@ body {
 .day-clear-btn:hover {
     background: rgba(255, 255, 255, 0.12);
     color: var(--text-primary);
+}
+
+/* --- Range Summary Info Banner --- */
+.range-summary-banner {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(0, 210, 255, 0.06);
+    border: 1px dashed rgba(0, 210, 255, 0.25);
+    border-radius: 12px;
+    padding: 10px 16px;
+    margin-top: 14px;
+    font-size: 13px;
+    color: var(--text-secondary);
+    font-family: 'Sarabun', sans-serif;
+    animation: fadeIn 0.3s ease;
+    width: 100%;
+}
+
+.range-summary-banner i {
+    color: var(--color-water);
+    font-size: 14px;
+}
+
+.range-summary-banner strong {
+    color: var(--color-water);
+    font-weight: 700;
+}
+
+.range-banner-text {
+    line-height: 1.5;
 }
