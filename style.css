@@ -986,3 +986,128 @@ body {
 .range-banner-text {
     line-height: 1.5;
 }
+
+/* --- Water Quality Section --- */
+.quality-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-top: 16px;
+}
+
+.quality-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 16px;
+    transition: var(--transition-smooth);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 160px;
+    position: relative;
+    overflow: hidden;
+}
+
+.quality-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 3px;
+    background: transparent;
+    transition: var(--transition-smooth);
+}
+
+.quality-card:hover {
+    transform: translateY(-3px);
+    border-color: var(--border-hover);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.quality-card:nth-child(1):hover::before { background: #4e9af1; } /* pH */
+.quality-card:nth-child(2):hover::before { background: #dfa837; } /* Turbidity */
+.quality-card:nth-child(3):hover::before { background: #37d3df; } /* Conductivity */
+.quality-card:nth-child(4):hover::before { background: #af37df; } /* TDS */
+.quality-card:nth-child(5):hover::before { background: #37df8c; } /* Chlorine */
+
+.q-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.q-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.q-icon {
+    font-size: 16px;
+    opacity: 0.8;
+}
+
+.ph-color { color: #4e9af1; }
+.turb-color { color: #dfa837; }
+.cond-color { color: #37d3df; }
+.tds-color { color: #af37df; }
+.cl-color { color: #37df8c; }
+
+.q-value-wrap {
+    margin: 12px 0 6px 0;
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+}
+
+.q-value {
+    font-family: 'Outfit', sans-serif;
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.q-unit {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.q-kpi-tag {
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 6px;
+    display: inline-block;
+    margin-bottom: 10px;
+    align-self: flex-start;
+    font-weight: 600;
+    border: 1px solid transparent;
+}
+
+.q-kpi-tag.pass {
+    background: rgba(46, 204, 113, 0.1);
+    color: var(--color-kpi-pass);
+    border: 1px solid rgba(46, 204, 113, 0.2);
+}
+
+.q-kpi-tag.fail {
+    background: rgba(231, 76, 60, 0.1);
+    color: var(--color-kpi-fail);
+    border: 1px solid rgba(231, 76, 60, 0.2);
+}
+
+.q-sub-text {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: var(--text-muted);
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    padding-top: 8px;
+}
+
+.q-sub-text strong {
+    color: var(--text-secondary);
+}
+
