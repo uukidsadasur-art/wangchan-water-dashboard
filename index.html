@@ -227,6 +227,102 @@
             </div>
         </section>
 
+        <!-- Water Quality Dashboard Section -->
+        <section class="quality-section card-panel" style="margin-bottom: 20px;">
+            <div class="panel-header">
+                <h2><i class="fa-solid fa-droplet" style="color:var(--color-water);"></i> คุณภาพน้ำจ่าย (Water Quality)</h2>
+                <span class="panel-desc">พารามิเตอร์คุณภาพน้ำจ่ายหลักเฉลี่ย/รายวันตามข้อมูลใบรายงานคุณภาพน้ำ</span>
+            </div>
+            
+            <div class="quality-grid">
+                <!-- 1. pH Card -->
+                <div class="quality-card">
+                    <div class="q-card-header">
+                        <span class="q-title">ความเป็นกรด-ด่าง (pH)</span>
+                        <i class="fa-solid fa-gauge-simple-high q-icon ph-color"></i>
+                    </div>
+                    <div class="q-value-wrap">
+                        <span class="q-value" id="q-ph">-</span>
+                        <span class="q-unit">pH</span>
+                    </div>
+                    <div class="q-kpi-tag" id="q-ph-tag">-</div>
+                    <div class="q-sub-text">
+                        <span>เฉลี่ยเดือนนี้: <strong id="q-ph-month">-</strong></span>
+                        <span>เฉลี่ยทั้งปี: <strong id="q-ph-year">-</strong></span>
+                    </div>
+                </div>
+
+                <!-- 2. Turbidity Card -->
+                <div class="quality-card">
+                    <div class="q-card-header">
+                        <span class="q-title">ความขุ่น (Turbidity)</span>
+                        <i class="fa-solid fa-smog q-icon turb-color"></i>
+                    </div>
+                    <div class="q-value-wrap">
+                        <span class="q-value" id="q-turb">-</span>
+                        <span class="q-unit">NTU</span>
+                    </div>
+                    <div class="q-kpi-tag" id="q-turb-tag">-</div>
+                    <div class="q-sub-text">
+                        <span>เฉลี่ยเดือนนี้: <strong id="q-turb-month">-</strong></span>
+                        <span>เฉลี่ยทั้งปี: <strong id="q-turb-year">-</strong></span>
+                    </div>
+                </div>
+
+                <!-- 3. Conductivity Card -->
+                <div class="quality-card">
+                    <div class="q-card-header">
+                        <span class="q-title">ความนำไฟฟ้า (Conductivity)</span>
+                        <i class="fa-solid fa-wave-square q-icon cond-color"></i>
+                    </div>
+                    <div class="q-value-wrap">
+                        <span class="q-value" id="q-cond">-</span>
+                        <span class="q-unit">µS/cm</span>
+                    </div>
+                    <div class="q-kpi-tag" id="q-cond-tag">-</div>
+                    <div class="q-sub-text">
+                        <span>เฉลี่ยเดือนนี้: <strong id="q-cond-month">-</strong></span>
+                        <span>เฉลี่ยทั้งปี: <strong id="q-cond-year">-</strong></span>
+                    </div>
+                </div>
+
+                <!-- 4. TDS Card -->
+                <div class="quality-card">
+                    <div class="q-card-header">
+                        <span class="q-title">สารละลายทั้งหมด (TDS)</span>
+                        <i class="fa-solid fa-cubes q-icon tds-color"></i>
+                    </div>
+                    <div class="q-value-wrap">
+                        <span class="q-value" id="q-tds">-</span>
+                        <span class="q-unit">mg/L</span>
+                    </div>
+                    <div class="q-kpi-tag" id="q-tds-tag">-</div>
+                    <div class="q-sub-text">
+                        <span>เฉลี่ยเดือนนี้: <strong id="q-tds-month">-</strong></span>
+                        <span>เฉลี่ยทั้งปี: <strong id="q-tds-year">-</strong></span>
+                    </div>
+                </div>
+
+                <!-- 5. Residual Chlorine Card -->
+                <div class="quality-card">
+                    <div class="q-card-header">
+                        <span class="q-title">คลอรีนคงเหลือ (Residual Cl)</span>
+                        <i class="fa-solid fa-shield-virus q-icon cl-color"></i>
+                    </div>
+                    <div class="q-value-wrap">
+                        <span class="q-value" id="q-chlorine">-</span>
+                        <span class="q-unit">mg/L</span>
+                    </div>
+                    <div class="q-kpi-tag" id="q-chlorine-tag">-</div>
+                    <div class="q-sub-text">
+                        <span>เฉลี่ยเดือนนี้: <strong id="q-chlorine-month">-</strong></span>
+                        <span>เฉลี่ยทั้งปี: <strong id="q-chlorine-year">-</strong></span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+
         <!-- Main Visual Charts Layout -->
         <main class="dashboard-main-grid">
             <!-- Main Yield & Production Trend -->
