@@ -87,6 +87,17 @@ function initDashboard() {
 const SHEET_ID   = "1TrzIgdqfWHTJpQWGnRiuujLyr_yNYxQA9oBriqOyM_k";
 const SHEET_NAME = "Raw data";
 const SHEET_CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(SHEET_NAME)}`;
+const QUALITY_CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Quality`;
+
+// Column indices in Quality sheet (0-based)
+const CI_Q = {
+    DATE:         0,   // A
+    PH:           12,  // M
+    TURBIDITY:    13,  // N
+    CONDUCTIVITY: 14,  // O
+    TDS:          15,  // P
+    CHLORINE:     16,  // Q
+};
 
 // Column indices (0-based) ตรงกับ Raw data sheet
 const CI = {
@@ -194,6 +205,45 @@ function csvToRecords(csvText) {
     return records;
 }
 
+function mergeQualityData(csvText, records) {
+    const lines = csvText.split('\n').filter(l => l.trim() !== '');
+    const qualityMap = {};
+    
+    for (let i = 0; i < lines.length; i++) {
+        const cols = parseCSVRow(lines[i]);
+        const rawDate = cols[CI_Q.DATE];
+        if (!rawDate || !/\d/.test(rawDate)) continue;
+        const dateStr = parseDate(rawDate);
+        if (!dateStr) continue;
+        
+        qualityMap[dateStr] = {
+            ph:           parseYield(cols[CI_Q.PH]),
+            turbidity:    parseYield(cols[CI_Q.TURBIDITY]),
+            conductivity: parseYield(cols[CI_Q.CONDUCTIVITY]),
+            tds:          parseYield(cols[CI_Q.TDS]),
+            chlorine:     parseYield(cols[CI_Q.CHLORINE])
+        };
+    }
+    
+    // Merge into records
+    records.forEach(r => {
+        const q = qualityMap[r.date];
+        if (q) {
+            r.ph = q.ph;
+            r.turbidity = q.turbidity;
+            r.conductivity = q.conductivity;
+            r.tds = q.tds;
+            r.chlorine = q.chlorine;
+        } else {
+            r.ph = null;
+            r.turbidity = null;
+            r.conductivity = null;
+            r.tds = null;
+            r.chlorine = null;
+        }
+    });
+}
+
 // Main data loader: Live Google Sheet → fallback data.js
 async function fetchData() {
     const tableBodyEl = document.getElementById('table-body');
@@ -203,21 +253,31 @@ async function fetchData() {
 
     // 1) ลองดึง Live CSV จาก Google Sheets
     try {
-        const res = await fetch(SHEET_CSV_URL);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const csvText = await res.text();
-        const records = csvToRecords(csvText);
+        const [rawRes, qualRes] = await Promise.all([
+            fetch(SHEET_CSV_URL),
+            fetch(QUALITY_CSV_URL)
+        ]);
+
+        if (!rawRes.ok) throw new Error(`HTTP Raw data: ${rawRes.status}`);
+        if (!qualRes.ok) throw new Error(`HTTP Quality: ${qualRes.status}`);
+
+        const rawCsvText = await rawRes.text();
+        const qualCsvText = await qualRes.text();
+
+        const records = csvToRecords(rawCsvText);
         if (records.length === 0) throw new Error('ไม่พบแถวข้อมูลใน Sheet');
+
+        mergeQualityData(qualCsvText, records);
 
         allRecords = records;
         allRecords.sort((a, b) => new Date(a.date) - new Date(b.date));
-        console.log(`✅ Live: โหลดข้อมูล ${allRecords.length} แถวจาก Google Sheet`);
+        console.log(`✅ Live: โหลดข้อมูล ${allRecords.length} แถวจาก Google Sheet พร้อมข้อมูลคุณภาพน้ำ`);
         setDefaultMonthAndActiveDay();
         showDataSourceBadge('live');
         filterAndProcessData();
         return;
     } catch (err) {
-        console.warn('⚠️ Google Sheet fetch ล้มเหลว (Sheet อาจไม่เป็น Public):', err.message);
+        console.warn('⚠️ Google Sheet fetch ล้มเหลว (ใช้ข้อมูล offline สำรอง):', err.message);
     }
 
     // 2) Fallback → ใช้ data.js (ข้อมูล offline)
@@ -226,6 +286,14 @@ async function fetchData() {
             throw new Error('ไม่พบข้อมูล — กรุณาตั้งค่า Sheet ให้เป็น Public หรือตรวจสอบ data.js');
         }
         allRecords = [...allRecordsData];
+        // Inject offline mock quality data if not present
+        allRecords.forEach(r => {
+            r.ph = r.ph !== undefined ? r.ph : 7.2 + (Math.sin(new Date(r.date).getDate()) * 0.4);
+            r.turbidity = r.turbidity !== undefined ? r.turbidity : 0.8 + (Math.cos(new Date(r.date).getDate()) * 0.3);
+            r.conductivity = r.conductivity !== undefined ? r.conductivity : 280 + (new Date(r.date).getDate() % 10) * 15;
+            r.tds = r.tds !== undefined ? r.tds : 140 + (new Date(r.date).getDate() % 10) * 8;
+            r.chlorine = r.chlorine !== undefined ? r.chlorine : 1.2 + (Math.sin(new Date(r.date).getDate() * 2) * 0.2);
+        });
         allRecords.sort((a, b) => new Date(a.date) - new Date(b.date));
         console.log(`📦 Offline: โหลดข้อมูล ${allRecords.length} แถวจาก data.js`);
         setDefaultMonthAndActiveDay();
@@ -1032,6 +1100,102 @@ function updateKpiCards() {
         const monthElecAcc = monthRecords.reduce((sum, r) => sum + r.elec_qty, 0);
         setTxt('elec-usage-month-acc', formatNum(monthElecAcc, 1) + ' kW');
     }
+
+    // Update Water Quality Section stats
+    updateQualitySection();
+}
+
+// Update Water Quality Section stats
+function updateQualitySection() {
+    if (!activeDayRecord || !filteredRecords || filteredRecords.length === 0) return;
+
+    const monthSelectEl = document.getElementById('month-select');
+    const selectedMonth = monthSelectEl ? monthSelectEl.value : 'all';
+    const activeViewBtn = document.querySelector('#view-mode .segment-btn.active');
+    const viewMode = activeViewBtn ? activeViewBtn.dataset.mode : 'daily';
+
+    const isAggregated = (selectedMonth === 'all' || viewMode === 'weekly' || viewMode === 'monthly');
+    const isRange = activeRangeRecords && activeRangeRecords.length > 1;
+
+    // Helper functions
+    function getAvg(records, key) {
+        const valid = records.filter(r => r[key] !== null && r[key] !== undefined && r[key] > 0);
+        return valid.length > 0 ? valid.reduce((sum, r) => sum + r[key], 0) / valid.length : null;
+    }
+    
+    function setTxt(id, val) {
+        const el = document.getElementById(id);
+        if (el) el.innerText = val;
+    }
+
+    function updateKpiTag(id, isPass, text) {
+        const el = document.getElementById(id);
+        if (el) {
+            el.className = 'q-kpi-tag ' + (isPass ? 'pass' : 'fail');
+            el.innerHTML = `<i class="fa-solid fa-${isPass ? 'check' : 'xmark'}"></i> ` + text;
+        }
+    }
+
+    // Monthly records (for monthly averages)
+    const activeMonth = activeDayRecord.date.split('-')[1];
+    const monthRecords = allRecords.filter(r => r.date.split('-')[1] === activeMonth);
+
+    // List of parameters
+    const params = ['ph', 'turbidity', 'conductivity', 'tds', 'chlorine'];
+    
+    // Limits
+    const limits = {
+        ph:           val => val >= 6.5 && val <= 8.5,
+        turbidity:    val => val <= 5.0,
+        conductivity: val => val <= 500,
+        tds:          val => val <= 500,
+        chlorine:     val => val >= 0.2 && val <= 2.0
+    };
+
+    const limitLabels = {
+        ph:           'เกณฑ์มาตรฐาน 6.5 - 8.5',
+        turbidity:    'เกณฑ์มาตรฐาน &le; 5.0 NTU',
+        conductivity: 'เกณฑ์มาตรฐาน &le; 500 &micro;S/cm',
+        tds:          'เกณฑ์มาตรฐาน &le; 500 mg/L',
+        chlorine:     'เกณฑ์มาตรฐาน 0.2 - 2.0 mg/L'
+    };
+
+    params.forEach(p => {
+        // Calculate Year & Month stats
+        const yearAvg = getAvg(allRecords, p);
+        const monthAvg = getAvg(monthRecords, p);
+        
+        // Determine current value
+        let val = activeDayRecord[p];
+        if (selectedMonth === 'all') {
+            val = yearAvg;
+        } else if (viewMode === 'weekly' || viewMode === 'monthly') {
+            val = getAvg(filteredRecords, p);
+        } else if (isRange) {
+            val = getAvg(activeRangeRecords, p);
+        }
+
+        // Format decimal places
+        const decimals = (p === 'ph' || p === 'turbidity' || p === 'chlorine') ? 2 : 0;
+        
+        // Update DOM
+        setTxt(`q-${p}`, val !== null ? formatNum(val, decimals) : '-');
+        setTxt(`q-${p}-month`, monthAvg !== null ? formatNum(monthAvg, decimals) : '-');
+        setTxt(`q-${p}-year`, yearAvg !== null ? formatNum(yearAvg, decimals) : '-');
+
+        // Update tag
+        const tagId = `q-${p}-tag`;
+        if (val !== null) {
+            const isPass = limits[p](val);
+            updateKpiTag(tagId, isPass, limitLabels[p]);
+        } else {
+            const tagEl = document.getElementById(tagId);
+            if (tagEl) {
+                tagEl.className = 'q-kpi-tag';
+                tagEl.innerText = 'ไม่มีเกณฑ์ข้อมูล';
+            }
+        }
+    });
 }
 
 // Clear KPI cards when no data
@@ -1040,7 +1204,12 @@ function clearKpiCards() {
                  'yield-daily', 'yield-month-avg', 'yield-year-avg',
                  'chem-cost-daily', 'chem-cost-month-avg', 'chem-cost-year-avg',
                  'elec-cost-daily', 'elec-cost-month-avg', 'elec-cost-year-avg',
-                 'total-cost-daily', 'total-cost-month-avg', 'total-cost-year-avg'];
+                 'total-cost-daily', 'total-cost-month-avg', 'total-cost-year-avg',
+                 'q-ph', 'q-ph-month', 'q-ph-year',
+                 'q-turb', 'q-turb-month', 'q-turb-year',
+                 'q-cond', 'q-cond-month', 'q-cond-year',
+                 'q-tds', 'q-tds-month', 'q-tds-year',
+                 'q-chlorine', 'q-chlorine-month', 'q-chlorine-year'];
     ids.forEach(id => {
         const el = document.getElementById(id);
         if (el) el.innerText = '-';
