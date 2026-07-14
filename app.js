@@ -1143,6 +1143,15 @@ function updateQualitySection() {
     // List of parameters
     const params = ['ph', 'turbidity', 'conductivity', 'tds', 'chlorine'];
     
+    // Parameter keys to HTML IDs mapping
+    const paramIdMap = {
+        ph:           'ph',
+        turbidity:    'turb',
+        conductivity: 'cond',
+        tds:          'tds',
+        chlorine:     'chlorine'
+    };
+
     // Limits
     const limits = {
         ph:           val => val >= 6.5 && val <= 8.5,
@@ -1161,6 +1170,8 @@ function updateQualitySection() {
     };
 
     params.forEach(p => {
+        const id = paramIdMap[p];
+        
         // Calculate Year & Month stats
         const yearAvg = getAvg(allRecords, p);
         const monthAvg = getAvg(monthRecords, p);
@@ -1179,12 +1190,12 @@ function updateQualitySection() {
         const decimals = (p === 'ph' || p === 'turbidity' || p === 'chlorine') ? 2 : 0;
         
         // Update DOM
-        setTxt(`q-${p}`, val !== null ? formatNum(val, decimals) : '-');
-        setTxt(`q-${p}-month`, monthAvg !== null ? formatNum(monthAvg, decimals) : '-');
-        setTxt(`q-${p}-year`, yearAvg !== null ? formatNum(yearAvg, decimals) : '-');
+        setTxt(`q-${id}`, val !== null ? formatNum(val, decimals) : '-');
+        setTxt(`q-${id}-month`, monthAvg !== null ? formatNum(monthAvg, decimals) : '-');
+        setTxt(`q-${id}-year`, yearAvg !== null ? formatNum(yearAvg, decimals) : '-');
 
         // Update tag
-        const tagId = `q-${p}-tag`;
+        const tagId = `q-${id}-tag`;
         if (val !== null) {
             const isPass = limits[p](val);
             updateKpiTag(tagId, isPass, limitLabels[p]);
