@@ -690,6 +690,19 @@ function updateKpiCards() {
         return;
     }
 
+    const monthSelectEl = document.getElementById('month-select');
+    const selectedMonth = monthSelectEl ? monthSelectEl.value : 'all';
+    const activeViewBtn = document.querySelector('#view-mode .segment-btn.active');
+    const viewMode = activeViewBtn ? activeViewBtn.dataset.mode : 'daily';
+
+    const isAggregated = (selectedMonth === 'all' || viewMode === 'weekly' || viewMode === 'monthly');
+
+    // Toggle Day Picker Visibility
+    const dayPickerSection = document.getElementById('day-picker-section');
+    if (dayPickerSection) {
+        dayPickerSection.style.display = isAggregated ? 'none' : 'block';
+    }
+
     const isRange = activeRangeRecords && activeRangeRecords.length > 1;
 
     // A. Yearly calculation (always constant across the 2026 data set)
@@ -752,20 +765,76 @@ function updateKpiCards() {
         rangeTotalAvg = rangeTotalRecs.reduce((sum, r) => sum + r.total_cost_m3, 0) / (rangeTotalRecs.length || 1);
     }
 
+    // D. Aggregation Calculations for Weekly/Monthly/Yearly
+    let weeklyWaterAvg = 0, weeklyYieldAvg = 0, weeklyChemAvg = 0, weeklyElecAvg = 0, weeklyTotalAvg = 0;
+    let monthlyWaterAvg = 0, monthlyYieldAvg = 0, monthlyChemAvg = 0, monthlyElecAvg = 0, monthlyTotalAvg = 0;
+
+    if (viewMode === 'weekly') {
+        const weeklyData = aggregateWeekly(filteredRecords);
+        weeklyWaterAvg = weeklyData.reduce((sum, w) => sum + w.water_qty, 0) / (weeklyData.length || 1);
+        
+        const weeklyYieldRecs = weeklyData.filter(w => w.system_yield !== null && w.system_yield > 0);
+        weeklyYieldAvg = weeklyYieldRecs.reduce((sum, w) => sum + w.system_yield, 0) / (weeklyYieldRecs.length || 1);
+        
+        const weeklyChemRecs = weeklyData.filter(w => w.chem_cost_m3 > 0);
+        weeklyChemAvg = weeklyChemRecs.reduce((sum, w) => sum + w.chem_cost_m3, 0) / (weeklyChemRecs.length || 1);
+        
+        const weeklyElecRecs = weeklyData.filter(w => w.elec_cost_m3 > 0);
+        weeklyElecAvg = weeklyElecRecs.reduce((sum, w) => sum + w.elec_cost_m3, 0) / (weeklyElecRecs.length || 1);
+        
+        const weeklyTotalRecs = weeklyData.filter(w => w.total_cost_m3 > 0);
+        weeklyTotalAvg = weeklyTotalRecs.reduce((sum, w) => sum + w.total_cost_m3, 0) / (weeklyTotalRecs.length || 1);
+    }
+
+    if (viewMode === 'monthly') {
+        const monthlyData = aggregateMonthly(filteredRecords);
+        monthlyWaterAvg = monthlyData.reduce((sum, m) => sum + m.water_qty, 0) / (monthlyData.length || 1);
+        
+        const monthlyYieldRecs = monthlyData.filter(m => m.system_yield !== null && m.system_yield > 0);
+        monthlyYieldAvg = monthlyYieldRecs.reduce((sum, m) => sum + m.system_yield, 0) / (monthlyYieldRecs.length || 1);
+        
+        const monthlyChemRecs = monthlyData.filter(m => m.chem_cost_m3 > 0);
+        monthlyChemAvg = monthlyChemRecs.reduce((sum, m) => sum + m.chem_cost_m3, 0) / (monthlyChemRecs.length || 1);
+        
+        const monthlyElecRecs = monthlyData.filter(m => m.elec_cost_m3 > 0);
+        monthlyElecAvg = monthlyElecRecs.reduce((sum, m) => sum + m.elec_cost_m3, 0) / (monthlyElecRecs.length || 1);
+        
+        const monthlyTotalRecs = monthlyData.filter(m => m.total_cost_m3 > 0);
+        monthlyTotalAvg = monthlyTotalRecs.reduce((sum, m) => sum + m.total_cost_m3, 0) / (monthlyTotalRecs.length || 1);
+    }
+
     // Helper to set text content safely
     function setTxt(id, val) {
         const el = document.getElementById(id);
         if (el) el.innerText = val;
     }
 
-    // D. Update KPI Cards Title based on state
+    // E. Update KPI Cards Title based on state
     const waterCardTitle = document.querySelector('#kpi-water h3');
     const yieldCardTitle = document.querySelector('#kpi-yield h3');
     const chemCardTitle = document.querySelector('#kpi-chem-cost h3');
     const elecCardTitle = document.querySelector('#kpi-elec-cost h3');
     const totalCardTitle = document.querySelector('#kpi-total-cost h3');
 
-    if (isRange) {
+    if (selectedMonth === 'all') {
+        if (waterCardTitle) waterCardTitle.innerHTML = 'ผลรวมปริมาณน้ำจ่ายสะสม <span style="font-size:11px;color:var(--text-muted);font-weight:normal;">(รายปี 2569)</span>';
+        if (yieldCardTitle) yieldCardTitle.innerHTML = 'System Yield เฉลี่ย <span style="font-size:11px;color:var(--text-muted);font-weight:normal;">(รายปี 2569)</span>';
+        if (chemCardTitle) chemCardTitle.innerHTML = 'ต้นทุนเคมีเฉลี่ย <span style="font-size:11px;color:var(--text-muted);font-weight:normal;">(รายปี 2569)</span>';
+        if (elecCardTitle) elecCardTitle.innerHTML = 'ต้นทุนไฟฟ้าเฉลี่ย <span style="font-size:11px;color:var(--text-muted);font-weight:normal;">(รายปี 2569)</span>';
+        if (totalCardTitle) totalCardTitle.innerHTML = 'ต้นทุนรวมเฉลี่ย <span style="font-size:11px;color:var(--text-muted);font-weight:normal;">(รายปี 2569)</span>';
+    } else if (viewMode === 'weekly') {
+        if (waterCardTitle) waterCardTitle.innerHTML = 'ปริมาณน้ำจ่ายเฉลี่ย <span style="font-size:11px;color:var(--text-muted);font-weight:normal;">(รายสัปดาห์)</span>';
+        if (yieldCardTitle) yieldCardTitle.innerHTML = 'System Yield เฉลี่ย <span style="font-size:11px;color:var(--text-muted);font-weight:normal;">(รายสัปดาห์)</span>';
+        if (chemCardTitle) chemCardTitle.innerHTML = 'ต้นทุนเคมีเฉลี่ย <span style="font-size:11px;color:var(--text-muted);font-weight:normal;">(รายสัปดาห์)</span>';
+        if (elecCardTitle) elecCardTitle.innerHTML = 'ต้นทุนไฟฟ้าเฉลี่ย <span style="font-size:11px;color:var(--text-muted);font-weight:normal;">(รายสัปดาห์)</span>';
+        if (totalCardTitle) totalCardTitle.innerHTML = 'ต้นทุนรวมเฉลี่ย <span style="font-size:11px;color:var(--text-muted);font-weight:normal;">(รายสัปดาห์)</span>';
+    } else if (viewMode === 'monthly') {
+        if (waterCardTitle) waterCardTitle.innerHTML = 'ปริมาณน้ำจ่ายเฉลี่ย <span style="font-size:11px;color:var(--text-muted);font-weight:normal;">(รายเดือน)</span>';
+        if (yieldCardTitle) yieldCardTitle.innerHTML = 'System Yield เฉลี่ย <span style="font-size:11px;color:var(--text-muted);font-weight:normal;">(รายเดือน)</span>';
+        if (chemCardTitle) chemCardTitle.innerHTML = 'ต้นทุนเคมีเฉลี่ย <span style="font-size:11px;color:var(--text-muted);font-weight:normal;">(รายเดือน)</span>';
+        if (elecCardTitle) elecCardTitle.innerHTML = 'ต้นทุนไฟฟ้าเฉลี่ย <span style="font-size:11px;color:var(--text-muted);font-weight:normal;">(รายเดือน)</span>';
+        if (totalCardTitle) totalCardTitle.innerHTML = 'ต้นทุนรวมเฉลี่ย <span style="font-size:11px;color:var(--text-muted);font-weight:normal;">(รายเดือน)</span>';
+    } else if (isRange) {
         if (waterCardTitle) waterCardTitle.innerHTML = 'ผลรวมปริมาณน้ำจ่าย <span style="font-size:11px;color:var(--text-muted);font-weight:normal;">(ช่วงที่เลือก)</span>';
         if (yieldCardTitle) yieldCardTitle.innerHTML = 'System Yield เฉลี่ย <span style="font-size:11px;color:var(--text-muted);font-weight:normal;">(ช่วงที่เลือก)</span>';
         if (chemCardTitle) chemCardTitle.innerHTML = 'ต้นทุนเคมีเฉลี่ย <span style="font-size:11px;color:var(--text-muted);font-weight:normal;">(ช่วงที่เลือก)</span>';
@@ -779,9 +848,18 @@ function updateKpiCards() {
         if (totalCardTitle) totalCardTitle.innerHTML = 'ต้นทุนรวม (เคมี + ไฟฟ้า)';
     }
 
-    // E. Update DOM
+    // F. Update DOM
     // 1. Water Qty
-    const waterVal = isRange ? rangeWaterSum : activeDayRecord.water_qty;
+    let waterVal = activeDayRecord.water_qty;
+    if (selectedMonth === 'all') {
+        waterVal = yearWaterAcc;
+    } else if (viewMode === 'weekly') {
+        waterVal = weeklyWaterAvg;
+    } else if (viewMode === 'monthly') {
+        waterVal = monthlyWaterAvg;
+    } else if (isRange) {
+        waterVal = rangeWaterSum;
+    }
     setTxt('water-daily', formatNum(waterVal));
     setTxt('water-month-acc', formatNum(monthWaterAcc) + ' ลบ.ม.');
     setTxt('water-month-avg', formatNum(monthWaterAvg, 1) + ' ลบ.ม./วัน');
@@ -789,7 +867,16 @@ function updateKpiCards() {
     setTxt('water-year-avg', formatNum(yearWaterAvg, 1) + ' ลบ.ม./วัน');
 
     // 2. System Yield
-    const yieldVal = isRange ? rangeYieldAvg : activeDayRecord.system_yield;
+    let yieldVal = activeDayRecord.system_yield;
+    if (selectedMonth === 'all') {
+        yieldVal = yearYieldAvg;
+    } else if (viewMode === 'weekly') {
+        yieldVal = weeklyYieldAvg;
+    } else if (viewMode === 'monthly') {
+        yieldVal = monthlyYieldAvg;
+    } else if (isRange) {
+        yieldVal = rangeYieldAvg;
+    }
     const yieldDailyTxt = yieldVal !== null ? formatNum(yieldVal, 2) : '-';
     setTxt('yield-daily', yieldDailyTxt);
     setTxt('yield-month-avg', formatNum(monthYieldAvg, 2) + ' %');
@@ -800,18 +887,23 @@ function updateKpiCards() {
     if (yieldCard && yieldVal !== null) {
         const tag = yieldCard.querySelector('.kpi-target-tag');
         if (tag) {
-            if (yieldVal >= CONTRACT_YIELD) {
-                tag.className = 'kpi-target-tag kpi-pass';
-                tag.innerHTML = `<i class="fa-solid fa-check"></i> ${isRange ? 'เฉลี่ย' : ''}ได้ตามข้อกำหนดสัญญา (&ge; 97%)`;
-            } else {
-                tag.className = 'kpi-target-tag kpi-fail';
-                tag.innerHTML = `<i class="fa-solid fa-xmark"></i> ${isRange ? 'เฉลี่ย' : ''}ต่ำกว่าข้อกำหนดสัญญา (&lt; 97%)`;
-            }
+            const isPassing = yieldVal >= CONTRACT_YIELD;
+            tag.className = 'kpi-target-tag ' + (isPassing ? 'kpi-pass' : 'kpi-fail');
+            tag.innerHTML = `<i class="fa-solid fa-${isPassing ? 'check' : 'xmark'}"></i> ${(selectedMonth === 'all' || viewMode !== 'daily' || isRange) ? 'เฉลี่ย' : ''}${isPassing ? 'ได้ตามข้อกำหนดสัญญา' : 'ต่ำกว่าข้อกำหนดสัญญา'} (&ge; 97%)`;
         }
     }
 
     // 3. Chemical Cost/m3
-    const chemVal = isRange ? rangeChemAvg : activeDayRecord.chem_cost_m3;
+    let chemVal = activeDayRecord.chem_cost_m3;
+    if (selectedMonth === 'all') {
+        chemVal = yearChemAvg;
+    } else if (viewMode === 'weekly') {
+        chemVal = weeklyChemAvg;
+    } else if (viewMode === 'monthly') {
+        chemVal = monthlyChemAvg;
+    } else if (isRange) {
+        chemVal = rangeChemAvg;
+    }
     setTxt('chem-cost-daily', formatNum(chemVal, 2));
     setTxt('chem-cost-month-avg', formatNum(monthChemAvg, 2) + ' บาท/ลบ.ม.');
     setTxt('chem-cost-year-avg', formatNum(yearChemAvg, 2) + ' บาท/ลบ.ม.');
@@ -819,17 +911,22 @@ function updateKpiCards() {
     // Check Chem Cost KPI
     const chemTag = document.getElementById('kpi-tag-chem');
     if (chemTag) {
-        if (chemVal <= KPI_CHEM) {
-            chemTag.className = 'kpi-target-tag kpi-pass';
-            chemTag.innerHTML = `<i class="fa-solid fa-check"></i> ${isRange ? 'เฉลี่ย' : ''}ได้ตาม KPI (&le; ${KPI_CHEM})`;
-        } else {
-            chemTag.className = 'kpi-target-tag kpi-fail';
-            chemTag.innerHTML = `<i class="fa-solid fa-xmark"></i> ${isRange ? 'เฉลี่ย' : ''}เกิน KPI (&gt; ${KPI_CHEM})`;
-        }
+        const isPassing = chemVal <= KPI_CHEM;
+        chemTag.className = 'kpi-target-tag ' + (isPassing ? 'kpi-pass' : 'kpi-fail');
+        chemTag.innerHTML = `<i class="fa-solid fa-${isPassing ? 'check' : 'xmark'}"></i> ${(selectedMonth === 'all' || viewMode !== 'daily' || isRange) ? 'เฉลี่ย' : ''}${isPassing ? 'ได้ตาม KPI' : 'เกิน KPI'} (&le; ${KPI_CHEM})`;
     }
 
     // 4. Electricity Cost/m3
-    const elecVal = isRange ? rangeElecAvg : activeDayRecord.elec_cost_m3;
+    let elecVal = activeDayRecord.elec_cost_m3;
+    if (selectedMonth === 'all') {
+        elecVal = yearElecAvg;
+    } else if (viewMode === 'weekly') {
+        elecVal = weeklyElecAvg;
+    } else if (viewMode === 'monthly') {
+        elecVal = monthlyElecAvg;
+    } else if (isRange) {
+        elecVal = rangeElecAvg;
+    }
     setTxt('elec-cost-daily', formatNum(elecVal, 2));
     setTxt('elec-cost-month-avg', formatNum(monthElecAvg, 2) + ' บาท/ลบ.ม.');
     setTxt('elec-cost-year-avg', formatNum(yearElecAvg, 2) + ' บาท/ลบ.ม.');
@@ -837,17 +934,22 @@ function updateKpiCards() {
     // Check Elec Cost KPI
     const elecTag = document.getElementById('kpi-tag-elec');
     if (elecTag) {
-        if (elecVal <= KPI_ELEC) {
-            elecTag.className = 'kpi-target-tag kpi-pass';
-            elecTag.innerHTML = `<i class="fa-solid fa-check"></i> ${isRange ? 'เฉลี่ย' : ''}ได้ตาม KPI (&le; ${KPI_ELEC})`;
-        } else {
-            elecTag.className = 'kpi-target-tag kpi-fail';
-            elecTag.innerHTML = `<i class="fa-solid fa-xmark"></i> ${isRange ? 'เฉลี่ย' : ''}เกิน KPI (&gt; ${KPI_ELEC})`;
-        }
+        const isPassing = elecVal <= KPI_ELEC;
+        elecTag.className = 'kpi-target-tag ' + (isPassing ? 'kpi-pass' : 'kpi-fail');
+        elecTag.innerHTML = `<i class="fa-solid fa-${isPassing ? 'check' : 'xmark'}"></i> ${(selectedMonth === 'all' || viewMode !== 'daily' || isRange) ? 'เฉลี่ย' : ''}${isPassing ? 'ได้ตาม KPI' : 'เกิน KPI'} (&le; ${KPI_ELEC})`;
     }
 
     // 5. Total Cost/m3
-    const totalVal = isRange ? rangeTotalAvg : activeDayRecord.total_cost_m3;
+    let totalVal = activeDayRecord.total_cost_m3;
+    if (selectedMonth === 'all') {
+        totalVal = yearTotalAvg;
+    } else if (viewMode === 'weekly') {
+        totalVal = weeklyTotalAvg;
+    } else if (viewMode === 'monthly') {
+        totalVal = monthlyTotalAvg;
+    } else if (isRange) {
+        totalVal = rangeTotalAvg;
+    }
     setTxt('total-cost-daily', formatNum(totalVal, 2));
     setTxt('total-cost-month-avg', formatNum(monthTotalAvg, 2) + ' บาท/ลบ.ม.');
     setTxt('total-cost-year-avg', formatNum(yearTotalAvg, 2) + ' บาท/ลบ.ม.');
@@ -855,19 +957,15 @@ function updateKpiCards() {
     // Check Total Cost KPI
     const totalTag = document.getElementById('kpi-tag-total');
     if (totalTag) {
-        if (totalVal <= KPI_TOTAL) {
-            totalTag.className = 'kpi-target-tag kpi-pass';
-            totalTag.innerHTML = `<i class="fa-solid fa-check"></i> ${isRange ? 'เฉลี่ย' : ''}ได้ตาม KPI (&le; ${KPI_TOTAL})`;
-        } else {
-            totalTag.className = 'kpi-target-tag kpi-fail';
-            totalTag.innerHTML = `<i class="fa-solid fa-xmark"></i> ${isRange ? 'เฉลี่ย' : ''}เกิน KPI (&gt; ${KPI_TOTAL})`;
-        }
+        const isPassing = totalVal <= KPI_TOTAL;
+        totalTag.className = 'kpi-target-tag ' + (isPassing ? 'kpi-pass' : 'kpi-fail');
+        totalTag.innerHTML = `<i class="fa-solid fa-${isPassing ? 'check' : 'xmark'}"></i> ${(selectedMonth === 'all' || viewMode !== 'daily' || isRange) ? 'เฉลี่ย' : ''}${isPassing ? 'ได้ตาม KPI' : 'เกิน KPI'} (&le; ${KPI_TOTAL})`;
     }
 
-    // F. Update Range Info Banner in UI
+    // G. Update Range Info Banner in UI
     const rangeBanner = document.getElementById('range-summary-banner');
     if (rangeBanner) {
-        if (isRange) {
+        if (isRange && !isAggregated) {
             rangeBanner.style.display = 'flex';
             
             const startRec = activeRangeRecords[0];
@@ -910,9 +1008,30 @@ function updateKpiCards() {
     updateChemicalSection();
 
     // Update Electricity Section stats
-    setTxt('elec-usage-daily', formatNum(activeDayRecord.elec_qty, 1));
-    const monthElecAcc = monthRecords.reduce((sum, r) => sum + r.elec_qty, 0);
-    setTxt('elec-usage-month-acc', formatNum(monthElecAcc, 1) + ' kW');
+    const elecDailyLabel = document.querySelector('.elec-stat-card:nth-child(1) h4');
+    const elecMonthLabel = document.querySelector('.elec-stat-card:nth-child(2) h4');
+
+    if (isAggregated) {
+        const totalElec = filteredRecords.reduce((sum, r) => sum + r.elec_qty, 0);
+        const avgElec = totalElec / (filteredRecords.length || 1);
+        
+        if (elecDailyLabel) elecDailyLabel.innerText = 'ปริมาณการใช้ไฟฟ้าเฉลี่ย (ต่อวัน)';
+        setTxt('elec-usage-daily', formatNum(avgElec, 1));
+        
+        if (selectedMonth === 'all') {
+            if (elecMonthLabel) elecMonthLabel.innerText = 'ปริมาณการใช้ไฟฟ้าสะสมทั้งปี';
+        } else {
+            if (elecMonthLabel) elecMonthLabel.innerText = 'ปริมาณการใช้ไฟฟ้าสะสมทั้งเดือน';
+        }
+        setTxt('elec-usage-month-acc', formatNum(totalElec, 1) + ' kW');
+    } else {
+        if (elecDailyLabel) elecDailyLabel.innerText = 'ปริมาณการใช้ไฟฟ้า';
+        setTxt('elec-usage-daily', formatNum(activeDayRecord.elec_qty, 1));
+        
+        if (elecMonthLabel) elecMonthLabel.innerText = 'ปริมาณการใช้ไฟฟ้าสะสมทั้งเดือน';
+        const monthElecAcc = monthRecords.reduce((sum, r) => sum + r.elec_qty, 0);
+        setTxt('elec-usage-month-acc', formatNum(monthElecAcc, 1) + ' kW');
+    }
 }
 
 // Clear KPI cards when no data
@@ -930,29 +1049,77 @@ function clearKpiCards() {
 
 // Update Chemical tab content
 function updateChemicalSection() {
-    if (!activeDayRecord) return;
+    if (!filteredRecords || filteredRecords.length === 0) return;
     
     const chemMeta = chemKeyMap[activeChem];
-    const activeMonth = activeDayRecord.date.split('-')[1];
-    const monthRecords = allRecords.filter(r => r.date.split('-')[1] === activeMonth);
+    const monthSelectEl = document.getElementById('month-select');
+    const selectedMonth = monthSelectEl ? monthSelectEl.value : 'all';
     
-    const dailyQty = activeDayRecord[chemMeta.qty];
-    const dailyCost = activeDayRecord[chemMeta.cost];
+    const activeViewBtn = document.querySelector('#view-mode .segment-btn.active');
+    const viewMode = activeViewBtn ? activeViewBtn.dataset.mode : 'daily';
     
-    const monthQtyAcc = monthRecords.reduce((sum, r) => sum + r[chemMeta.qty], 0);
-    const monthCostAcc = monthRecords.reduce((sum, r) => sum + r[chemMeta.cost], 0);
+    const isAggregated = (selectedMonth === 'all' || viewMode === 'weekly' || viewMode === 'monthly');
+    
+    let labelQtyDaily = document.querySelector('.chem-stat-card:nth-child(1) h4');
+    let labelCostDaily = document.querySelector('.chem-stat-card:nth-child(3) h4');
     
     function setTxt(id, val) {
         const el = document.getElementById(id);
         if (el) el.innerText = val;
     }
 
-    setTxt('tab-chem-qty-daily', formatNum(dailyQty, 1));
-    setTxt('tab-chem-qty-month-acc', formatNum(monthQtyAcc, 1) + ' kg');
-    setTxt('tab-chem-cost-daily', formatNum(dailyCost, 1));
-    setTxt('tab-chem-cost-month-acc', formatNum(monthCostAcc, 1) + ' บาท');
+    if (isAggregated) {
+        // Show averages/totals for the entire filtered period
+        const totalQty = filteredRecords.reduce((sum, r) => sum + r[chemMeta.qty], 0);
+        const totalCost = filteredRecords.reduce((sum, r) => sum + r[chemMeta.cost], 0);
+        const avgQty = totalQty / (filteredRecords.length || 1);
+        const avgCost = totalCost / (filteredRecords.length || 1);
+        
+        if (labelQtyDaily) labelQtyDaily.innerText = 'ปริมาณการใช้เฉลี่ย (ต่อวัน)';
+        if (labelCostDaily) labelCostDaily.innerText = 'ค่าสารเคมีเฉลี่ย (ต่อวัน)';
+        
+        setTxt('tab-chem-qty-daily', formatNum(avgQty, 1));
+        setTxt('tab-chem-cost-daily', formatNum(avgCost, 1));
+        
+        // Month acc can show the total sum for the filtered period (whether month or year)
+        setTxt('tab-chem-qty-month-acc', formatNum(totalQty, 1) + ' kg');
+        setTxt('tab-chem-cost-month-acc', formatNum(totalCost, 1) + ' บาท');
+        
+        const labelQtyMonth = document.querySelector('.chem-stat-card:nth-child(2) h4');
+        const labelCostMonth = document.querySelector('.chem-stat-card:nth-child(4) h4');
+        if (selectedMonth === 'all') {
+            if (labelQtyMonth) labelQtyMonth.innerText = 'ปริมาณการใช้สะสมทั้งปี';
+            if (labelCostMonth) labelCostMonth.innerText = 'ค่าสารเคมีสะสมทั้งปี';
+        } else {
+            if (labelQtyMonth) labelQtyMonth.innerText = 'ปริมาณการใช้สะสมทั้งเดือน';
+            if (labelCostMonth) labelCostMonth.innerText = 'ค่าสารเคมีสะสมทั้งเดือน';
+        }
+    } else {
+        // Regular daily view
+        if (activeDayRecord) {
+            const dailyQty = activeDayRecord[chemMeta.qty];
+            const dailyCost = activeDayRecord[chemMeta.cost];
+            
+            const activeMonth = activeDayRecord.date.split('-')[1];
+            const monthRecords = allRecords.filter(r => r.date.split('-')[1] === activeMonth);
+            const monthQtyAcc = monthRecords.reduce((sum, r) => sum + r[chemMeta.qty], 0);
+            const monthCostAcc = monthRecords.reduce((sum, r) => sum + r[chemMeta.cost], 0);
+            
+            if (labelQtyDaily) labelQtyDaily.innerText = 'ปริมาณการใช้รายวัน';
+            if (labelCostDaily) labelCostDaily.innerText = 'ค่าสารเคมีรายวัน';
+            
+            setTxt('tab-chem-qty-daily', formatNum(dailyQty, 1));
+            setTxt('tab-chem-cost-daily', formatNum(dailyCost, 1));
+            setTxt('tab-chem-qty-month-acc', formatNum(monthQtyAcc, 1) + ' kg');
+            setTxt('tab-chem-cost-month-acc', formatNum(monthCostAcc, 1) + ' บาท');
+            
+            const labelQtyMonth = document.querySelector('.chem-stat-card:nth-child(2) h4');
+            const labelCostMonth = document.querySelector('.chem-stat-card:nth-child(4) h4');
+            if (labelQtyMonth) labelQtyMonth.innerText = 'ปริมาณการใช้สะสมทั้งเดือน';
+            if (labelCostMonth) labelCostMonth.innerText = 'ค่าสารเคมีสะสมทั้งเดือน';
+        }
+    }
 
-    // Rerender Chemical detail chart
     renderChemDetailChart();
 }
 
