@@ -1154,17 +1154,15 @@ function updateQualitySection() {
 
     // Limits
     const limits = {
-        ph:           val => val >= 6.5 && val <= 8.5,
-        turbidity:    val => val <= 5.0,
-        conductivity: val => val <= 500,
+        ph:           val => val >= 6.5 && val <= 7.5,
+        turbidity:    val => val <= 3.0,
         tds:          val => val <= 500,
         chlorine:     val => val >= 0.2 && val <= 2.0
     };
 
     const limitLabels = {
-        ph:           'เกณฑ์มาตรฐาน 6.5 - 8.5',
-        turbidity:    'เกณฑ์มาตรฐาน &le; 5.0 NTU',
-        conductivity: 'เกณฑ์มาตรฐาน &le; 500 &micro;S/cm',
+        ph:           'เกณฑ์มาตรฐาน 6.5 - 7.5',
+        turbidity:    'เกณฑ์มาตรฐาน &le; 3.0 NTU',
         tds:          'เกณฑ์มาตรฐาน &le; 500 mg/L',
         chlorine:     'เกณฑ์มาตรฐาน 0.2 - 2.0 mg/L'
     };
@@ -1196,14 +1194,19 @@ function updateQualitySection() {
 
         // Update tag
         const tagId = `q-${id}-tag`;
-        if (val !== null) {
-            const isPass = limits[p](val);
-            updateKpiTag(tagId, isPass, limitLabels[p]);
-        } else {
-            const tagEl = document.getElementById(tagId);
-            if (tagEl) {
-                tagEl.className = 'q-kpi-tag';
-                tagEl.innerText = 'ไม่มีเกณฑ์ข้อมูล';
+        const tagEl = document.getElementById(tagId);
+        if (tagEl) {
+            if (p === 'conductivity') {
+                tagEl.style.display = 'none';
+            } else {
+                tagEl.style.display = 'inline-block';
+                if (val !== null) {
+                    const isPass = limits[p](val);
+                    updateKpiTag(tagId, isPass, limitLabels[p]);
+                } else {
+                    tagEl.className = 'q-kpi-tag';
+                    tagEl.innerText = 'ไม่มีเกณฑ์ข้อมูล';
+                }
             }
         }
     });
