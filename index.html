@@ -338,9 +338,18 @@
 
             <!-- Costs Trend vs KPI Limits -->
             <div class="chart-container-medium card-panel">
-                <div class="panel-header">
-                    <h2><i class="fa-solid fa-chart-column"></i> สรุปต้นทุนน้ำประปาเทียบกับค่า KPI</h2>
-                    <span class="panel-desc">ต้นทุนสารเคมี, ต้นทุนไฟฟ้า, และต้นทุนรวมเทียบกับเส้นควบคุมเกณฑ์สัญญา</span>
+                <div class="panel-header flex-header">
+                    <div>
+                        <h2><i class="fa-solid fa-chart-column"></i> สรุปต้นทุนน้ำประปาเทียบกับค่า KPI</h2>
+                        <span class="panel-desc">เปรียบเทียบต้นทุนเทียบกับเส้นควบคุมเกณฑ์สัญญา</span>
+                    </div>
+                    <div class="custom-select-wrapper">
+                        <select id="cost-chart-select" class="custom-select" style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 6px; padding: 4px 8px; font-family: 'Sarabun', sans-serif; font-size: 12px; outline: none; cursor: pointer;">
+                            <option value="total">ต้นทุนรวม</option>
+                            <option value="chem">ต้นทุนสารเคมี</option>
+                            <option value="elec">ต้นทุนไฟฟ้า</option>
+                        </select>
+                    </div>
                 </div>
                 <div class="chart-wrapper">
                     <canvas id="costsKpiChart"></canvas>
@@ -387,6 +396,48 @@
                     <!-- Tab Chart -->
                     <div class="tab-chart-wrapper">
                         <canvas id="chemDetailChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chemical Concentration (ppm) Section -->
+            <div class="card-panel chem-ppm-panel-section" style="grid-column: span 2; margin-top: 20px;">
+                <div class="panel-header flex-header">
+                    <div>
+                        <h2><i class="fa-solid fa-flask-vial" style="color: #a855f7;"></i> ความเข้มข้นในการใช้สารเคมี (Chemical Concentration)</h2>
+                        <span class="panel-desc">สถิติและแนวโน้มค่าความเข้มข้นสารเคมีที่จ่ายเข้าระบบผลิตน้ำประปา (ppm)</span>
+                    </div>
+                    <!-- Chemical Concentration Selector -->
+                    <div class="tab-list" id="chem-ppm-tabs">
+                        <button class="tab-btn active" data-chem="alum">Alum</button>
+                        <button class="tab-btn" data-chem="chlorine">Chlorine</button>
+                        <button class="tab-btn" data-chem="citric">Citric Acid</button>
+                        <button class="tab-btn" data-chem="hcl">HCl</button>
+                        <button class="tab-btn" data-chem="naoh">NaOH</button>
+                    </div>
+                </div>
+                
+                <div class="chem-data-details">
+                    <div class="chem-stats-grid">
+                        <div class="mini-stat-card">
+                            <span class="label">ความเข้มข้นวันนี้</span>
+                            <div class="val"><span id="tab-ppm-daily">-</span> <span class="unit">ppm</span></div>
+                        </div>
+                        <div class="mini-stat-card">
+                            <span class="label">ค่าเฉลี่ยช่วงนี้</span>
+                            <div class="val"><span id="tab-ppm-range-avg">-</span> <span class="unit">ppm</span></div>
+                        </div>
+                        <div class="mini-stat-card">
+                            <span class="label">ค่าเฉลี่ยเดือนนี้</span>
+                            <div class="val"><span id="tab-ppm-month-avg">-</span> <span class="unit">ppm</span></div>
+                        </div>
+                        <div class="mini-stat-card">
+                            <span class="label">ค่าเฉลี่ยทั้งปี</span>
+                            <div class="val"><span id="tab-ppm-year-avg">-</span> <span class="unit">ppm</span></div>
+                        </div>
+                    </div>
+                    <div class="tab-chart-wrapper">
+                        <canvas id="chemPpmChart"></canvas>
                     </div>
                 </div>
             </div>
