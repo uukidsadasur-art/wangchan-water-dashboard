@@ -30,6 +30,7 @@ const chemKeyMap = {
     naoh: { name: 'NaOH', qty: 'naoh_qty', cost: 'naoh_cost', color: '#00e676' }
 };
 let activeChem = 'alum';
+let activeChemPpm = 'alum';
 
 const AUTH_HASH = "b3ae63623322432aec33906c5bfc62be924a9ad8ce6e24f844b92df7e8333070"; // SHA-256 for 'wangchan2026'
 
@@ -389,6 +390,38 @@ function setupEventListeners() {
             
             activeChem = btn.dataset.chem;
             updateChemicalSection();
+        });
+    }
+
+    const costChartSelectEl = document.getElementById('cost-chart-select');
+    if (costChartSelectEl) {
+        costChartSelectEl.addEventListener('change', () => {
+            let dataset = [];
+            const activeViewBtn = document.querySelector('#view-mode .segment-btn.active');
+            const viewMode = activeViewBtn ? activeViewBtn.dataset.mode : 'daily';
+            
+            if (viewMode === 'daily') {
+                dataset = [...filteredRecords];
+            } else if (viewMode === 'weekly') {
+                dataset = aggregateWeekly(filteredRecords);
+            } else if (viewMode === 'monthly') {
+                dataset = aggregateMonthly(filteredRecords);
+            }
+            renderCostsKpiChart(dataset, viewMode);
+        });
+    }
+
+    const chemPpmTabsEl = document.getElementById('chem-ppm-tabs');
+    if (chemPpmTabsEl) {
+        chemPpmTabsEl.addEventListener('click', (e) => {
+            const btn = e.target.closest('.tab-btn');
+            if (!btn) return;
+            
+            chemPpmTabsEl.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            
+            activeChemPpm = btn.dataset.chem;
+            updateChemPpmSection();
         });
     }
 
@@ -1411,6 +1444,7 @@ function updateCharts(viewMode) {
     renderCostsKpiChart(dataset, viewMode);
     renderElectricityChart(dataset, viewMode);
     renderChemDetailChart(); // Uses its own filtered set based on active chemical
+    updateChemPpmSection();
 }
 
 // Aggregate Data by Week
@@ -1610,11 +1644,44 @@ function renderYieldProductionChart(dataset, viewMode) {
 // Chart 2: Costs comparison against KPI Limits
 function renderCostsKpiChart(dataset, viewMode) {
     const ctx = document.getElementById('costsKpiChart').getContext('2d');
-    
+    if (!ctx) return;
+
+    const costSelect = document.getElementById('cost-chart-select');
+    const activeCost = costSelect ? costSelect.value : 'total';
+
     const labels = dataset.map(d => formatDateLabel(d.date, viewMode));
-    const chemData = dataset.map(d => d.chem_cost_m3);
-    const elecData = dataset.map(d => d.elec_cost_m3);
-    const totalData = dataset.map(d => d.total_cost_m3);
+    
+    let chartData = [];
+    let kpiVal = 0;
+    let labelText = '';
+    let borderColor = '';
+    let bgColor = '';
+    let kpiLabelText = '';
+
+    if (activeCost === 'total') {
+        chartData = dataset.map(d => d.total_cost_m3);
+        kpiVal = KPI_TOTAL;
+        labelText = 'ต้นทุนรวม (บาท/ลบ.ม.)';
+        kpiLabelText = `KPI ต้นทุนรวม (≤ ${KPI_TOTAL} บาท/ลบ.ม.)`;
+        borderColor = 'rgba(255, 85, 51, 1)';
+        bgColor = 'rgba(255, 85, 51, 0.05)';
+    } else if (activeCost === 'chem') {
+        chartData = dataset.map(d => d.chem_cost_m3);
+        kpiVal = KPI_CHEM;
+        labelText = 'ต้นทุนสารเคมี (บาท/ลบ.ม.)';
+        kpiLabelText = `KPI ต้นทุนสารเคมี (≤ ${KPI_CHEM} บาท/ลบ.ม.)`;
+        borderColor = 'rgba(204, 102, 255, 1)';
+        bgColor = 'rgba(204, 102, 255, 0.05)';
+    } else if (activeCost === 'elec') {
+        chartData = dataset.map(d => d.elec_cost_m3);
+        kpiVal = KPI_ELEC;
+        labelText = 'ต้นทุนไฟฟ้า (บาท/ลบ.ม.)';
+        kpiLabelText = `KPI ต้นทุนไฟฟ้า (≤ ${KPI_ELEC} บาท/ลบ.ม.)`;
+        borderColor = 'rgba(255, 204, 0, 1)';
+        bgColor = 'rgba(255, 204, 0, 0.05)';
+    }
+
+    const kpiData = Array(dataset.length).fill(kpiVal);
 
     if (charts.costsKpi) {
         charts.costsKpi.destroy();
@@ -1626,29 +1693,22 @@ function renderCostsKpiChart(dataset, viewMode) {
             labels: labels,
             datasets: [
                 {
-                    label: 'ต้นทุนรวม (บาท/ลบ.ม.)',
-                    data: totalData,
-                    borderColor: 'rgba(255, 85, 51, 1)',
-                    backgroundColor: 'rgba(255, 85, 51, 0.05)',
+                    label: labelText,
+                    data: chartData,
+                    borderColor: borderColor,
+                    backgroundColor: bgColor,
                     borderWidth: 2,
                     pointRadius: 1,
                     tension: 0.2
                 },
                 {
-                    label: 'ต้นทุนสารเคมี (บาท/ลบ.ม.)',
-                    data: chemData,
-                    borderColor: 'rgba(204, 102, 255, 0.8)',
+                    label: kpiLabelText,
+                    data: kpiData,
+                    borderColor: 'rgba(231, 76, 60, 0.8)',
                     borderWidth: 1.5,
-                    pointRadius: 0.5,
-                    tension: 0.2
-                },
-                {
-                    label: 'ต้นทุนไฟฟ้า (บาท/ลบ.ม.)',
-                    data: elecData,
-                    borderColor: 'rgba(255, 204, 0, 0.8)',
-                    borderWidth: 1.5,
-                    pointRadius: 0.5,
-                    tension: 0.2
+                    borderDash: [5, 5],
+                    pointRadius: 0,
+                    fill: false
                 }
             ]
         },
@@ -1674,6 +1734,114 @@ function renderCostsKpiChart(dataset, viewMode) {
                     grid: { color: 'rgba(255,255,255,0.05)' },
                     ticks: { color: '#94a3b8', font: { family: 'Outfit' } },
                     title: { display: true, text: 'ต้นทุน (บาท ต่อ ลบ.ม.)', color: '#94a3b8', font: { family: 'Sarabun' } }
+                }
+            }
+        }
+    });
+}
+
+// Update Chemical PPM tab content and chart
+function updateChemPpmSection() {
+    if (!filteredRecords || filteredRecords.length === 0) return;
+    
+    const chemMeta = chemKeyMap[activeChemPpm];
+    const monthSelectEl = document.getElementById('month-select');
+    const selectedMonth = monthSelectEl ? monthSelectEl.value : 'all';
+    const activeViewBtn = document.querySelector('#view-mode .segment-btn.active');
+    const viewMode = activeViewBtn ? activeViewBtn.dataset.mode : 'daily';
+
+    const isAggregated = (selectedMonth === 'all' || viewMode === 'weekly' || viewMode === 'monthly');
+    const isRange = activeRangeRecords && activeRangeRecords.length > 1;
+
+    // Averages helper
+    function getAvg(records, key) {
+        const valid = records.filter(r => r[key] !== null && r[key] !== undefined && r[key] > 0);
+        return valid.length > 0 ? valid.reduce((sum, r) => sum + r[key], 0) / valid.length : null;
+    }
+
+    function setTxt(id, val) {
+        const el = document.getElementById(id);
+        if (el) el.innerText = val;
+    }
+
+    // Determine current value
+    let val = activeDayRecord ? activeDayRecord[chemMeta.qty] : null;
+    if (selectedMonth === 'all') {
+        val = getAvg(allRecords, chemMeta.qty);
+    } else if (viewMode === 'weekly' || viewMode === 'monthly') {
+        val = getAvg(filteredRecords, chemMeta.qty);
+    } else if (isRange) {
+        val = getAvg(activeRangeRecords, chemMeta.qty);
+    }
+
+    // Calculate month & year stats
+    const activeMonth = activeDayRecord ? activeDayRecord.date.split('-')[1] : null;
+    const monthRecords = allRecords.filter(r => r.date.split('-')[1] === activeMonth);
+    const monthAvg = getAvg(monthRecords, chemMeta.qty);
+    const yearAvg = getAvg(allRecords, chemMeta.qty);
+    const rangeAvg = isRange ? getAvg(activeRangeRecords, chemMeta.qty) : val;
+
+    setTxt('tab-ppm-daily', val !== null ? formatNum(val, 2) : '-');
+    setTxt('tab-ppm-range-avg', rangeAvg !== null ? formatNum(rangeAvg, 2) : '-');
+    setTxt('tab-ppm-month-avg', monthAvg !== null ? formatNum(monthAvg, 2) : '-');
+    setTxt('tab-ppm-year-avg', yearAvg !== null ? formatNum(yearAvg, 2) : '-');
+
+    // Render PPM chart
+    const ctx = document.getElementById('chemPpmChart').getContext('2d');
+    if (!ctx) return;
+
+    let dataset = [];
+    if (viewMode === 'daily') {
+        dataset = [...filteredRecords];
+    } else if (viewMode === 'weekly') {
+        dataset = aggregateWeekly(filteredRecords);
+    } else if (viewMode === 'monthly') {
+        dataset = aggregateMonthly(filteredRecords);
+    }
+
+    const labels = dataset.map(r => formatDateLabel(r.date, viewMode));
+    const ppmData = dataset.map(r => r[chemMeta.qty]);
+
+    if (charts.chemPpm) {
+        charts.chemPpm.destroy();
+    }
+
+    charts.chemPpm = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: `ความเข้มข้น ${chemMeta.name} (ppm)`,
+                data: ppmData,
+                borderColor: chemMeta.color,
+                backgroundColor: 'rgba(255, 255, 255, 0.02)',
+                borderWidth: 2,
+                pointRadius: 1.5,
+                tension: 0.2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'top',
+                    labels: { color: '#94a3b8', font: { family: 'Sarabun', size: 11 } }
+                },
+                tooltip: {
+                    titleFont: { family: 'Sarabun' },
+                    bodyFont: { family: 'Sarabun' }
+                }
+            },
+            scales: {
+                x: {
+                    grid: { color: 'rgba(255,255,255,0.02)' },
+                    ticks: { color: '#64748b', font: { family: 'Outfit', size: 10 } }
+                },
+                y: {
+                    grid: { color: 'rgba(255,255,255,0.05)' },
+                    ticks: { color: '#94a3b8', font: { family: 'Outfit' } },
+                    title: { display: true, text: 'ความเข้มข้น (ppm)', color: '#94a3b8', font: { family: 'Sarabun' } }
                 }
             }
         }
