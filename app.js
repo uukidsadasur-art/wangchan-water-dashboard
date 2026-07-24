@@ -1,7 +1,7 @@
 // Global State and Constants
 const KPI_CHEM = 1.12;
 const KPI_ELEC = 1.42;
-const KPI_TOTAL = 2.54;
+const KPI_TOTAL = 2.15;
 const CONTRACT_YIELD = 97.0; // %
 
 let allRecords = [];
