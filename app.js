@@ -200,7 +200,7 @@ function csvToRecords(csvText) {
             chem_cost_m3:   parseNum(cols[CI.CHEM_COST_M3]),
             elec_qty:       parseNum(cols[CI.ELEC1]) + parseNum(cols[CI.ELEC2]),
             elec_cost_m3:   parseNum(cols[CI.ELEC_COST_M3]),
-            total_cost_m3:  parseNum(cols[CI.TOTAL_COST_M3]),
+            total_cost_m3:  parseNum(cols[CI.CHEM_COST_M3]) + parseNum(cols[CI.ELEC_COST_M3]),
         });
     }
     return records;
