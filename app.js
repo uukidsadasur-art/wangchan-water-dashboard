@@ -118,6 +118,8 @@ const CI = {
     TOTAL_COST_M3:  15,  // P
     WATER_QTY:      16,  // Q
     YIELD:          20,  // U
+    INLET_QTY:      18,  // S
+    PROD_QTY:       19,  // T
     ELEC1:          40,  // AO
     ELEC2:          42,  // AQ
 };
@@ -201,6 +203,8 @@ function csvToRecords(csvText) {
             elec_qty:       parseNum(cols[CI.ELEC1]) + parseNum(cols[CI.ELEC2]),
             elec_cost_m3:   parseNum(cols[CI.ELEC_COST_M3]),
             total_cost_m3:  parseNum(cols[CI.CHEM_COST_M3]) + parseNum(cols[CI.ELEC_COST_M3]),
+            inlet_qty:      parseNum(cols[CI.INLET_QTY]),
+            prod_qty:       parseNum(cols[CI.PROD_QTY]),
         });
     }
     return records;
@@ -810,8 +814,9 @@ function updateKpiCards() {
     const yearWaterAcc = allRecords.reduce((sum, r) => sum + r.water_qty, 0);
     const yearWaterAvg = yearWaterAcc / allRecords.length;
     
-    const yearYieldRecords = allRecords.filter(r => r.system_yield !== null && r.system_yield > 0);
-    const yearYieldAvg = yearYieldRecords.reduce((sum, r) => sum + r.system_yield, 0) / (yearYieldRecords.length || 1);
+    const yearInletSum = allRecords.reduce((sum, r) => sum + (r.inlet_qty || 0), 0);
+    const yearProdSum = allRecords.reduce((sum, r) => sum + (r.prod_qty || 0), 0);
+    const yearYieldAvg = yearInletSum > 0 ? (yearProdSum / yearInletSum * 100) : 0;
     
     const yearChemRecords = allRecords.filter(r => r.chem_cost_m3 > 0);
     const yearChemAvg = yearChemRecords.reduce((sum, r) => sum + r.chem_cost_m3, 0) / (yearChemRecords.length || 1);
@@ -829,8 +834,9 @@ function updateKpiCards() {
     const monthWaterAcc = monthRecords.reduce((sum, r) => sum + r.water_qty, 0);
     const monthWaterAvg = monthWaterAcc / monthRecords.length;
     
-    const monthYieldRecords = monthRecords.filter(r => r.system_yield !== null && r.system_yield > 0);
-    const monthYieldAvg = monthYieldRecords.reduce((sum, r) => sum + r.system_yield, 0) / (monthYieldRecords.length || 1);
+    const monthInletSum = monthRecords.reduce((sum, r) => sum + (r.inlet_qty || 0), 0);
+    const monthProdSum = monthRecords.reduce((sum, r) => sum + (r.prod_qty || 0), 0);
+    const monthYieldAvg = monthInletSum > 0 ? (monthProdSum / monthInletSum * 100) : 0;
     
     const monthChemRecords = monthRecords.filter(r => r.chem_cost_m3 > 0);
     const monthChemAvg = monthChemRecords.reduce((sum, r) => sum + r.chem_cost_m3, 0) / (monthChemRecords.length || 1);
@@ -853,8 +859,9 @@ function updateKpiCards() {
         rangeWaterSum = activeRangeRecords.reduce((sum, r) => sum + r.water_qty, 0);
         rangeWaterAvg = rangeWaterSum / activeRangeRecords.length;
         
-        const rangeYieldRecs = activeRangeRecords.filter(r => r.system_yield !== null && r.system_yield > 0);
-        rangeYieldAvg = rangeYieldRecs.reduce((sum, r) => sum + r.system_yield, 0) / (rangeYieldRecs.length || 1);
+        const rangeInletSum = activeRangeRecords.reduce((sum, r) => sum + (r.inlet_qty || 0), 0);
+        const rangeProdSum = activeRangeRecords.reduce((sum, r) => sum + (r.prod_qty || 0), 0);
+        rangeYieldAvg = rangeInletSum > 0 ? (rangeProdSum / rangeInletSum * 100) : 0;
 
         const rangeChemRecs = activeRangeRecords.filter(r => r.chem_cost_m3 > 0);
         rangeChemAvg = rangeChemRecs.reduce((sum, r) => sum + r.chem_cost_m3, 0) / (rangeChemRecs.length || 1);
@@ -874,8 +881,9 @@ function updateKpiCards() {
         const weeklyData = aggregateWeekly(filteredRecords);
         weeklyWaterAvg = weeklyData.reduce((sum, w) => sum + w.water_qty, 0) / (weeklyData.length || 1);
         
-        const weeklyYieldRecs = weeklyData.filter(w => w.system_yield !== null && w.system_yield > 0);
-        weeklyYieldAvg = weeklyYieldRecs.reduce((sum, w) => sum + w.system_yield, 0) / (weeklyYieldRecs.length || 1);
+        const weeklyInletSum = filteredRecords.reduce((sum, r) => sum + (r.inlet_qty || 0), 0);
+        const weeklyProdSum = filteredRecords.reduce((sum, r) => sum + (r.prod_qty || 0), 0);
+        weeklyYieldAvg = weeklyInletSum > 0 ? (weeklyProdSum / weeklyInletSum * 100) : 0;
         
         const weeklyChemRecs = weeklyData.filter(w => w.chem_cost_m3 > 0);
         weeklyChemAvg = weeklyChemRecs.reduce((sum, w) => sum + w.chem_cost_m3, 0) / (weeklyChemRecs.length || 1);
@@ -891,8 +899,9 @@ function updateKpiCards() {
         const monthlyData = aggregateMonthly(filteredRecords);
         monthlyWaterAvg = monthlyData.reduce((sum, m) => sum + m.water_qty, 0) / (monthlyData.length || 1);
         
-        const monthlyYieldRecs = monthlyData.filter(m => m.system_yield !== null && m.system_yield > 0);
-        monthlyYieldAvg = monthlyYieldRecs.reduce((sum, m) => sum + m.system_yield, 0) / (monthlyYieldRecs.length || 1);
+        const monthlyInletSum = filteredRecords.reduce((sum, r) => sum + (r.inlet_qty || 0), 0);
+        const monthlyProdSum = filteredRecords.reduce((sum, r) => sum + (r.prod_qty || 0), 0);
+        monthlyYieldAvg = monthlyInletSum > 0 ? (monthlyProdSum / monthlyInletSum * 100) : 0;
         
         const monthlyChemRecs = monthlyData.filter(m => m.chem_cost_m3 > 0);
         monthlyChemAvg = monthlyChemRecs.reduce((sum, m) => sum + m.chem_cost_m3, 0) / (monthlyChemRecs.length || 1);
@@ -1462,7 +1471,8 @@ function aggregateWeekly(records) {
             weeks[weekNum] = {
                 label: `สัปดาห์ที่ ${weekNum}`,
                 water_qty: 0,
-                system_yields: [],
+                inlet_qty: 0,
+                prod_qty: 0,
                 chem_costs: [],
                 elec_costs: [],
                 total_costs: [],
@@ -1472,8 +1482,9 @@ function aggregateWeekly(records) {
         
         weeks[weekNum].water_qty += r.water_qty;
         weeks[weekNum].elec_qty += r.elec_qty;
+        weeks[weekNum].inlet_qty += (r.inlet_qty || 0);
+        weeks[weekNum].prod_qty += (r.prod_qty || 0);
         
-        if (r.system_yield !== null && r.system_yield > 0) weeks[weekNum].system_yields.push(r.system_yield);
         if (r.chem_cost_m3 > 0) weeks[weekNum].chem_costs.push(r.chem_cost_m3);
         if (r.elec_cost_m3 > 0) weeks[weekNum].elec_costs.push(r.elec_cost_m3);
         if (r.total_cost_m3 > 0) weeks[weekNum].total_costs.push(r.total_cost_m3);
@@ -1484,7 +1495,7 @@ function aggregateWeekly(records) {
         return {
             date: w.label,
             water_qty: w.water_qty,
-            system_yield: w.system_yields.length > 0 ? (w.system_yields.reduce((s, x) => s + x, 0) / w.system_yields.length) : null,
+            system_yield: w.inlet_qty > 0 ? (w.prod_qty / w.inlet_qty * 100) : null,
             chem_cost_m3: w.chem_costs.length > 0 ? (w.chem_costs.reduce((s, x) => s + x, 0) / w.chem_costs.length) : 0,
             elec_cost_m3: w.elec_costs.length > 0 ? (w.elec_costs.reduce((s, x) => s + x, 0) / w.elec_costs.length) : 0,
             total_cost_m3: w.total_costs.length > 0 ? (w.total_costs.reduce((s, x) => s + x, 0) / w.total_costs.length) : 0,
@@ -1509,7 +1520,8 @@ function aggregateMonthly(records) {
             months[mName] = {
                 label: mName,
                 water_qty: 0,
-                system_yields: [],
+                inlet_qty: 0,
+                prod_qty: 0,
                 chem_costs: [],
                 elec_costs: [],
                 total_costs: [],
@@ -1519,8 +1531,9 @@ function aggregateMonthly(records) {
         
         months[mName].water_qty += r.water_qty;
         months[mName].elec_qty += r.elec_qty;
+        months[mName].inlet_qty += (r.inlet_qty || 0);
+        months[mName].prod_qty += (r.prod_qty || 0);
         
-        if (r.system_yield !== null && r.system_yield > 0) months[mName].system_yields.push(r.system_yield);
         if (r.chem_cost_m3 > 0) months[mName].chem_costs.push(r.chem_cost_m3);
         if (r.elec_cost_m3 > 0) months[mName].elec_costs.push(r.elec_cost_m3);
         if (r.total_cost_m3 > 0) months[mName].total_costs.push(r.total_cost_m3);
@@ -1531,7 +1544,7 @@ function aggregateMonthly(records) {
         return {
             date: m.label,
             water_qty: m.water_qty,
-            system_yield: m.system_yields.length > 0 ? (m.system_yields.reduce((s, x) => s + x, 0) / m.system_yields.length) : null,
+            system_yield: m.inlet_qty > 0 ? (m.prod_qty / m.inlet_qty * 100) : null,
             chem_cost_m3: m.chem_costs.length > 0 ? (m.chem_costs.reduce((s, x) => s + x, 0) / m.chem_costs.length) : 0,
             elec_cost_m3: m.elec_costs.length > 0 ? (m.elec_costs.reduce((s, x) => s + x, 0) / m.elec_costs.length) : 0,
             total_cost_m3: m.total_costs.length > 0 ? (m.total_costs.reduce((s, x) => s + x, 0) / m.total_costs.length) : 0,
